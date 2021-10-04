@@ -7,6 +7,8 @@ This project contains a userspace driver for the [AverMedia LGX2 (GC551)](https:
 It can be used to display the captured video and audio in a standalone window or
 to forward the captured video and audio to a virtual video capture device.
 
+Currently only supporting 1920x1080@30-60fps.
+
 **NOTE: Currently only 1920x1080@60fps is supported though capture is at 1920x1080@30fps**
 
 ## Building
@@ -47,3 +49,5 @@ In my limited testing, certain devices may need to be re-plugged in after the ap
 started. For example, a Nintendo Switch will not recognise the LGX2 as an output source until
 it is undocked and re-docked.
 
+## Demo
+See it in action over at [YouTube](https://www.youtube.com/watch?v=-yzHMbUn-w0).
