@@ -21,8 +21,8 @@ v4l::V4LFrameOutput::V4LFrameOutput(const std::string &deviceName) {
     }
     v.fmt.pix.width = 1920;
     v.fmt.pix.height = 1080;
-    v.fmt.pix.pixelformat = V4L2_PIX_FMT_UYVY;
-    v.fmt.pix.sizeimage = 1920 * 1080 * 2;
+    v.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+    v.fmt.pix.sizeimage = 1920 * 1080 * 4;
     v.fmt.pix.field = V4L2_FIELD_NONE;
     if (ioctl(_v4l2fd, VIDIOC_S_FMT, &v) == -1) {
         throw std::runtime_error("Cannot setup V4L2Loopback device");

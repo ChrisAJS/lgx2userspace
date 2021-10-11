@@ -13,6 +13,7 @@ int main(int argc, char **argv) {
     lgx2::FrameOutput *frameOutput;
     lgx2::Stream *stream;
 
+    // getopt
     if (argc > 1) {
         std::cout << "Rendering to V4L2Loopback device " << argv[1] << std::endl;
         frameOutput = new v4l::V4LFrameOutput(argv[1]);
