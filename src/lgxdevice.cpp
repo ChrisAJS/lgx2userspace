@@ -62,6 +62,7 @@ namespace lgx2 {
             }
             if (!inVideo && yuvData[i - 2] == 0x58FFFF00) {
                 inAudio = 1;
+                _frameBuilder.buildAudio((uint8_t *) (yuvData + i), 1);
             } else if (yuvData[i] == 0xAA5555AA) {
                 inAudio = 0;
                 produceAudioData(reinterpret_cast<uint8_t *>(_frameBuilder.completeAudioFrame()));
