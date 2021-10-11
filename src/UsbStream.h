@@ -11,13 +11,10 @@ namespace libusb {
         UsbStream();
 
         void streamSetupCommands() override;
-        void queueFrameRead(std::function<void(uint8_t *, uint32_t)> *onData) override;
+        void queueFrameRead(std::function<void(uint8_t *)> *onData) override;
         void update() override;
 
         void onFrameData(libusb_transfer *transfer);
-
-        void queueFrameOne();
-        void queueFrameTwo();
 
         void queueFutureFrame(libusb_transfer *transfer);
 
@@ -26,7 +23,7 @@ namespace libusb {
 
         std::vector<libusb_transfer*> _transfers;
 
-        std::function<void(uint8_t*, uint32_t)> *_onFrameDataCallback;
+        std::function<void(uint8_t*)> *_onFrameDataCallback;
 
         uint8_t *_frameBuffer;
     };

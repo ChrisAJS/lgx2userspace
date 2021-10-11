@@ -23,7 +23,7 @@ static void usbTransferComplete(struct libusb_transfer *transfer) {
         stream->onFrameData(transfer);
     }
 
-    stream->queueFutureFrame(transfer);
+    libusb_submit_transfer(transfer);
 }
 
 
@@ -92,7 +92,7 @@ namespace libusb {
         }
     }
 
-    void UsbStream::queueFrameRead(std::function<void(uint8_t *, uint32_t)> *onData) {
+    void UsbStream::queueFrameRead(std::function<void(uint8_t *)> *onData) {
         _onFrameDataCallback = onData;
         uint8_t endpoints[] = {LIBUSB_ENDPOINT_IN | 0x03};
         int streams = libusb_alloc_streams(_dev, 4, endpoints, 1);
@@ -110,7 +110,6 @@ namespace libusb {
         for (int i = 0; i < 8; i++) {
             libusb_submit_transfer(_transfers[i]);
         }
-//        queueFrameTwo();
     }
 
     void UsbStream::update() {
@@ -120,26 +119,6 @@ namespace libusb {
     void UsbStream::onFrameData(libusb_transfer *transfer) {
         libusb_submit_transfer(transfer);
 
-        (*_onFrameDataCallback)(transfer->buffer, transfer->actual_length);
-    }
-
-    void UsbStream::queueFrameOne() {
-        libusb_submit_transfer(_transfers[0]);
-        libusb_submit_transfer(_transfers[1]);
-    }
-
-    void UsbStream::queueFrameTwo() {
-        libusb_submit_transfer(_transfers[2]);
-        libusb_submit_transfer(_transfers[3]);
-    }
-
-    void UsbStream::queueFutureFrame(libusb_transfer *transfer) {
-//        if (transfer == _transfers[0]) {
-//            queueFrameTwo();
-//        } else if (transfer == _transfers[2]) {
-//            queueFrameOne();
-//        }
-
-        libusb_submit_transfer(transfer);
+        (*_onFrameDataCallback)(transfer->buffer);
     }
 }

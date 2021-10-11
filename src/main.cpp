@@ -6,7 +6,6 @@
 #include "version.h"
 #include "V4LFrameOutput.h"
 #include "FakeStream.h"
-#include "NullFrameOutput.h"
 
 int main(int argc, char **argv) {
     std::cout << "lgx2userspace v0.0.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
@@ -22,9 +21,6 @@ int main(int argc, char **argv) {
         frameOutput = new sdl::SdlFrameOutput();
     }
 
-//    frameOutput = new fake::NullFrameOutput();
-
-    //stream = new fake::FakeStream();
     stream = new libusb::UsbStream();
 
     lgx2::Device device{stream, frameOutput};

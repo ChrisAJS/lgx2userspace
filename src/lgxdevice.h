@@ -3,8 +3,6 @@
 
 #include <functional>
 #include <cstdint>
-#include <thread>
-
 #include "FrameBuilder.h"
 
 namespace lgx2 {
@@ -13,7 +11,7 @@ namespace lgx2 {
     public:
         virtual void streamSetupCommands() = 0;
 
-        virtual void queueFrameRead(std::function<void(uint8_t *frameData, uint32_t)> *onData) = 0;
+        virtual void queueFrameRead(std::function<void(uint8_t *frameData)> *onData) = 0;
 
         virtual void update() = 0;
     };
@@ -41,17 +39,13 @@ namespace lgx2 {
         FrameOutput *_frameOutput;
         utils::FrameBuilder _frameBuilder;
 
-        std::function<void(uint8_t *, uint32_t)> _onFrameData;
+        std::function<void(uint8_t *)> _onFrameData;
 
         void onFrameData(uint8_t *data);
 
         void produceVideoData(uint8_t *data);
 
         void produceAudioData(uint8_t *data);
-
-        void poll();
-
-        std::thread _pollThread;
     };
 
 }

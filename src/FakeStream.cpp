@@ -15,7 +15,7 @@ void fake::FakeStream::streamSetupCommands() {
     // NOOP
 }
 
-void fake::FakeStream::queueFrameRead(std::function<void(uint8_t *, uint32_t)> *onData) {
+void fake::FakeStream::queueFrameRead(std::function<void(uint8_t *)> *onData) {
     _onData = onData;
 }
 
@@ -26,6 +26,6 @@ void fake::FakeStream::update() {
         _fakeFrameSource = fopen("debug.bin", "r");
         fseek(_fakeFrameSource, 0x1FC000, SEEK_SET);
     }
-    (*_onData)(_fakeFrameBuffer, 1920*1080*2);
+    (*_onData)(_fakeFrameBuffer);
     SDL_Delay(9);
 }
