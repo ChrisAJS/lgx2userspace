@@ -9,17 +9,10 @@
 
 #include "commanddata.h"
 
-static int goodFrameCount = 0;
-
 static void usbTransferComplete(struct libusb_transfer *transfer) {
     auto *stream = static_cast<libusb::UsbStream *>(transfer->user_data);
 
     if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
-        if (*(uint32_t *) transfer->buffer == 0xC0FFFF00) {
-            goodFrameCount++;
-
-            printf("Good frames: %d\n", goodFrameCount);
-        }
         stream->onFrameData(transfer);
     }
 
@@ -75,13 +68,11 @@ namespace libusb {
 
     void UsbStream::queueFrameRead(std::function<void(uint8_t *)> *onData) {
         _onFrameDataCallback = onData;
-        uint8_t endpoints[] = {LIBUSB_ENDPOINT_IN | 0x03};
-        int streams = libusb_alloc_streams(_dev, 4, endpoints, 1);
 
         for (int i = 0; i < 8; i++) {
             libusb_transfer *transfer = libusb_alloc_transfer(0);
 
-            libusb_fill_bulk_stream_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03, streams + i,
+            libusb_fill_bulk_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
                                              _frameBuffer + 0x1FC000 * i, 0x1FC000,
                                              usbTransferComplete, this, 0);
 

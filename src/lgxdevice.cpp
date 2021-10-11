@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "lgxdevice.h"
 
 namespace lgx2 {
@@ -21,52 +22,28 @@ namespace lgx2 {
 
     void Device::onFrameData(uint8_t *data) {
         static int inVideo = 0;
-        static int posInImage = 0;
         static int inAudio = 0;
-        auto *yuvData = (uint32_t*)data;
-        uint32_t startPos = 0;
-        if (!inVideo) {
-            for(uint32_t i = 0; i < 0x1FC000/4; i++) {
-                if (yuvData[i] == 0xC0FFFF00) {
-                    inVideo = 1;
-                    startPos = i+2;
-                    posInImage = 0;
-                    break;
-                } else if (i > 2 && yuvData[i - 2] == 0x58FFFF00) {
-                    inAudio = 1;
-                    _frameBuilder.buildAudio((uint8_t *) (yuvData + i), 1);
-                } else if (inAudio  && yuvData[i] == 0xAA5555AA) {
-                    inAudio = 0;
-                    produceAudioData(reinterpret_cast<uint8_t *>(_frameBuilder.completeAudioFrame()));
-                } else if (inAudio) {
-                    _frameBuilder.buildAudio((uint8_t *) (yuvData + i), 1);
-                }
-            }
-        }
 
-        if (!inVideo) {
-            return;
-        }
+        auto *yuvData = (uint32_t *) data;
 
-        for (uint32_t i = startPos; i<0x1FC000/4; i++) {
-            if (posInImage > 1920 * 1080) {
-                inVideo = 0;
-                posInImage = 0;
-                produceVideoData(reinterpret_cast<uint8_t *>(_frameBuilder.completeVideoFrame()));
+        for (uint32_t i = 0; i < 0x1FC000 / 4; i++) {
+
+            if (i > 2 && yuvData[i - 2] == 0xC0FFFF00) {
+                inVideo = 1;
             }
+
+            if (i > 2 && yuvData[i - 2] == 0x58FFFF00) {
+                inAudio = 1;
+            }
+
             if (yuvData[i] == 0xC1FFFF00) {
                 inVideo = 0;
-                posInImage = 0;
                 produceVideoData(reinterpret_cast<uint8_t *>(_frameBuilder.completeVideoFrame()));
-
             }
-            if (!inVideo && yuvData[i - 2] == 0x58FFFF00) {
-                inAudio = 1;
-                _frameBuilder.buildAudio((uint8_t *) (yuvData + i), 1);
-            } else if (yuvData[i] == 0xAA5555AA) {
+
+            if (inAudio && yuvData[i] == 0xAA5555AA) {
                 inAudio = 0;
                 produceAudioData(reinterpret_cast<uint8_t *>(_frameBuilder.completeAudioFrame()));
-                break;
             }
 
             if (inVideo) {
