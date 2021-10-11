@@ -5,11 +5,11 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 
-add_executable(lgx2userspace src/main.cpp src/lgxdevice.cpp src/lgxdevice.h src/commanddata.cpp src/commanddata.h src/UsbStream.cpp src/UsbStream.h src/SdlFrameOutput.cpp src/SdlFrameOutput.h src/FrameBuilder.cpp src/FrameBuilder.h src/V4LFrameOutput.cpp src/V4LFrameOutput.h)
+add_executable(lgx2userspace src/main.cpp src/lgxdevice.cpp src/lgxdevice.h src/commanddata.cpp src/commanddata.h src/UsbStream.cpp src/UsbStream.h src/SdlFrameOutput.cpp src/SdlFrameOutput.h src/FrameBuilder.cpp src/FrameBuilder.h src/V4LFrameOutput.cpp src/V4LFrameOutput.h src/PulseAudioOutput.cpp src/PulseAudioOutput.h)
 
 target_include_directories(lgx2userspace PRIVATE /usr/include/SDL2)
 
-target_link_libraries(lgx2userspace PRIVATE usb-1.0 pthread SDL2_gfx SDL2)
+target_link_libraries(lgx2userspace PRIVATE usb-1.0 pthread SDL2_gfx SDL2 pulse-simple)
 
 ## Lovingly borrowed from https://www.mattkeeter.com/blog/2018-01-06-versioning/
 execute_process(COMMAND git log --pretty=format:'%h' -n 1
