@@ -38,16 +38,6 @@ namespace libusb {
 
         _frameBuffer = new uint8_t[0x1FC000 * 16];
 
-        uint8_t descriptor[18] = {0};
-        libusb_get_descriptor(_dev, LIBUSB_DT_DEVICE, 0, descriptor, 18);
-
-        struct libusb_config_descriptor *config = nullptr;
-
-        libusb_device *device = libusb_get_device(_dev);
-        if (libusb_get_config_descriptor(device, 0, &config) < 0) {
-            throw std::runtime_error("Failed getting device config descriptor\n");
-        }
-
         if (libusb_set_configuration(_dev, 1) != LIBUSB_SUCCESS) {
             throw std::runtime_error("Failed to set configuration\n");
         }
@@ -55,15 +45,6 @@ namespace libusb {
         if (libusb_claim_interface(_dev, 0) != LIBUSB_SUCCESS) {
             throw std::runtime_error("Could not claim interface for lgx2 - is something else using the device?\n");
         }
-
-        uint8_t string_descriptor[4] = {0};
-        uint8_t first_string_descriptor[1] = {0};
-        libusb_get_string_descriptor(_dev, 3, 0, string_descriptor, 4);
-        libusb_get_string_descriptor(_dev, 3, 0, string_descriptor, 4);
-        libusb_get_string_descriptor(_dev, 3, 0, first_string_descriptor, 1);
-
-        uint8_t second_string_descriptor[26] = {0};
-        libusb_get_string_descriptor(_dev, 3, 0, second_string_descriptor, 26);
     }
 
     void UsbStream::streamSetupCommands() {
