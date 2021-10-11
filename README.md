@@ -80,5 +80,42 @@ In my limited testing, certain devices may need to be re-plugged in after the ap
 started. For example, a Nintendo Switch will not recognise the LGX2 as an output source until
 it is undocked and re-docked.
 
+## Running with V4L2 Output and Pulseaudio Output
+### V4L2 Output setup
+To output video to a virtual webcam output source, load the V4L2 Loopback Linux module with an easy to identify device
+number:
+
+```bash
+sudo modprobe v4l2loopback video_nr=99 exclusive_caps=1 card_label="LGX2"
+```
+
+You should now see `/dev/video99` exists:
+
+```bash
+ls /dev/video99
+/dev/video99
+```
+
+### Pulseaudio Setup
+Pulseaudio can be configured by issuing the following commands:
+```bash
+pactl load-module module-null-sink sink_name=lgx2 sink_properties=device.description="LGX2 Audio Sink"
+pactl load-module module-remap-source master=lgx2.monitor source_name=lgx2 source_properties=device.description="LGX2 Audio"
+```
+This will create an audio sink called `LGX2 Audio Sink` which can be added to OBS as a Pulseaudio output capture device.
+
+**NOTE: The best way to control the audio volume is to use the gain OBS filter whilst leaving the sink volume at max.**
+
+### Running with configure V4L2 device
+Simply run the userspace driver with the V4L2 device:
+
+```bash
+./lgx2userspace /dev/video99
+```
+
+**NOTE: You may need to unplug and replug in your video source.**
+
+Go to OBS or other streaming software and select the LGX2 V4L2 source. You should now see video from the input device being output.
+
 ## Demo
 See it in action over at [YouTube](https://www.youtube.com/watch?v=-yzHMbUn-w0).
