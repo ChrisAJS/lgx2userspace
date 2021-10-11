@@ -7,13 +7,19 @@
 
 namespace sdl {
 
-    class SdlFrameOutput : public lgx2::FrameOutput {
+    class SdlFrameOutput : public lgx2::VideoOutput, public lgx2::AudioOutput {
     public:
         SdlFrameOutput();
+
+        void initialiseVideo() override;
+
+        void initialiseAudio() override;
 
         void videoFrameAvailable(uint32_t *image) override;
 
         void audioFrameAvailable(uint32_t *audio) override;
+
+        void display() override;
 
         void render() override;
 

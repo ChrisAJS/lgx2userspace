@@ -5,15 +5,15 @@
 #include "lgxdevice.h"
 
 namespace v4l {
-    class V4LFrameOutput : public lgx2::FrameOutput {
+    class V4LFrameOutput : public lgx2::VideoOutput {
     public:
         V4LFrameOutput(const std::string &deviceName);
 
+        void initialiseVideo() override;
+
         void videoFrameAvailable(uint32_t *image) override;
 
-        void audioFrameAvailable(uint32_t *audio) override;
-
-        void render() override;
+        void display() override;
 
     private:
         int _v4l2fd;

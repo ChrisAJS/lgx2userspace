@@ -10,6 +10,9 @@
 v4l::V4LFrameOutput::V4LFrameOutput(const std::string &deviceName) {
     _frameBuffer = new uint8_t[1920*1080*2];
     _v4l2fd = open(deviceName.c_str(), O_RDWR);
+}
+
+void v4l::V4LFrameOutput::initialiseVideo() {
     if (_v4l2fd == -1) {
         throw std::runtime_error("Failed to open V4L2 Loopback device");
     }
@@ -33,13 +36,9 @@ void v4l::V4LFrameOutput::videoFrameAvailable(uint32_t *image) {
     memcpy(_frameBuffer, image, 1920*1080*2);
 }
 
-void v4l::V4LFrameOutput::audioFrameAvailable(uint32_t *audio) {
-
-}
-
-void v4l::V4LFrameOutput::render() {
-    write(_v4l2fd, _frameBuffer, 1920 * 1080 * 2);
-//    if (write(_v4l2fd, _frameBuffer, 1920 * 1080 * 2) != 1920*1080*2) {
-//        throw std::runtime_error("Underwrite to V4L2Loopback device");
-//    }
+void v4l::V4LFrameOutput::display() {
+    ssize_t bytesWritten = write(_v4l2fd, _frameBuffer, 1920 * 1080 * 2);
+    if (bytesWritten < 1920 * 1080 * 2) {
+        printf("Only wrote %ld bytes (expected %d)\n", bytesWritten, 1920*1080*2);
+    }
 }

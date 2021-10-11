@@ -16,9 +16,19 @@ namespace lgx2 {
         virtual void update() = 0;
     };
 
-    class FrameOutput {
+    class VideoOutput {
     public:
+        virtual void initialiseVideo() = 0;
+
         virtual void videoFrameAvailable(uint32_t *image) = 0;
+
+        virtual void display() = 0;
+    private:
+    };
+
+    class AudioOutput {
+    public:
+        virtual void initialiseAudio() = 0;
 
         virtual void audioFrameAvailable(uint32_t *audio) = 0;
 
@@ -28,7 +38,7 @@ namespace lgx2 {
 
     class Device {
     public:
-        Device(Stream *stream, FrameOutput *frameOutput);
+        Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput);
 
         void initialise();
 
@@ -36,7 +46,9 @@ namespace lgx2 {
 
     private:
         Stream *_stream;
-        FrameOutput *_frameOutput;
+        VideoOutput *_videoOutput;
+        AudioOutput *_audioOutput;
+
         utils::FrameBuilder _frameBuilder;
 
         std::function<void(uint8_t *)> _onFrameData;
