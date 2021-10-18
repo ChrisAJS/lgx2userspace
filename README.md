@@ -79,8 +79,8 @@ ls /dev/video99
 ### Pulseaudio Setup
 Pulseaudio can be configured by issuing the following commands:
 ```bash
-pactl load-module module-null-sink sink_name=lgx2 sink_properties=device.description="LGX2 Audio Sink"
-pactl load-module module-remap-source master=lgx2.monitor source_name=lgx2 source_properties=device.description="LGX2 Audio"
+pactl load-module module-null-sink sink_name=lgx2 sink_properties=device.description=LGX2
+pactl load-module module-remap-source master=lgx2.monitor source_name=lgx2 source_properties=device.description=LGX2Audio
 ```
 This will create an audio sink called `LGX2 Audio Sink` which can be added to OBS as a Pulseaudio output capture device.
 
