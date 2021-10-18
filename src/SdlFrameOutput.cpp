@@ -9,9 +9,9 @@ namespace sdl {
     }
 
     void SdlFrameOutput::initialiseVideo() {
-        SDL_Window *screen = SDL_CreateWindow("lgx2userspace", 1920, 100, 1920, 1080, 0);
+        _window = SDL_CreateWindow("lgx2userspace", 1920, 100, 1920, 1080, 0);
 
-        _renderer = SDL_CreateRenderer(screen, -1, SDL_RENDERER_ACCELERATED);
+        _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
 
         _texture = SDL_CreateTexture(
                 _renderer,
@@ -47,6 +47,15 @@ namespace sdl {
     }
 
     void SdlFrameOutput::display() {
+
+        const Uint8 *keyboardState = SDL_GetKeyboardState(nullptr);
+
+        if (keyboardState[SDL_SCANCODE_F]) {
+            SDL_SetWindowFullscreen(_window, 1);
+        } else if (keyboardState[SDL_SCANCODE_G]) {
+            SDL_SetWindowFullscreen(_window, 0);
+        }
+        
         SDL_RenderCopy(_renderer, _texture, nullptr, nullptr);
         SDL_RenderPresent(_renderer);
     }

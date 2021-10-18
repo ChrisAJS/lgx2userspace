@@ -24,7 +24,7 @@ namespace sdl {
         void render() override;
 
     private:
-
+        SDL_Window *_window;
         SDL_Renderer *_renderer;
         SDL_Texture *_texture;
         SDL_AudioDeviceID _audio;

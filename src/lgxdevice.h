@@ -12,6 +12,7 @@ namespace lgx2 {
     public:
         virtual void logTimeStart(const std::string &name) = 0;
         virtual void logTimeEnd(const std::string &name, const std::string &message) = 0;
+        virtual void summarise() = 0;
     };
 
     class Stream {

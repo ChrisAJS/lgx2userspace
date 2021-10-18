@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 
-add_executable(lgx2userspace src/main.cpp src/lgxdevice.cpp src/lgxdevice.h src/commanddata.cpp src/commanddata.h src/UsbStream.cpp src/UsbStream.h src/SdlFrameOutput.cpp src/SdlFrameOutput.h src/FrameBuilder.cpp src/FrameBuilder.h src/V4LFrameOutput.cpp src/V4LFrameOutput.h src/PulseAudioOutput.cpp src/PulseAudioOutput.h src/NOOPLogger.cpp src/NOOPLogger.h src/ChronoLogger.cpp src/ChronoLogger.h)
+add_executable(lgx2userspace src/main.cpp src/lgxdevice.cpp src/lgxdevice.h src/commanddata.cpp src/commanddata.h src/UsbStream.cpp src/UsbStream.h src/SdlFrameOutput.cpp src/SdlFrameOutput.h src/FrameBuilder.cpp src/FrameBuilder.h src/V4LFrameOutput.cpp src/V4LFrameOutput.h src/PulseAudioOutput.cpp src/PulseAudioOutput.h src/NOOPLogger.cpp src/NOOPLogger.h src/ChronoLogger.cpp src/ChronoLogger.h src/OptionParser.cpp src/OptionParser.h)
 
 target_include_directories(lgx2userspace PRIVATE /usr/include/SDL2)
 

@@ -9,6 +9,8 @@ public:
     void logTimeStart(const std::string &name) override;
 
     void logTimeEnd(const std::string &name, const std::string &message) override;
+
+    void summarise() override;
 };
 
 
