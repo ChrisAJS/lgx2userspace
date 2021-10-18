@@ -3,9 +3,16 @@
 
 #include <functional>
 #include <cstdint>
+#include <string>
 #include "FrameBuilder.h"
 
 namespace lgx2 {
+
+    class Logger {
+    public:
+        virtual void logTimeStart(const std::string &name) = 0;
+        virtual void logTimeEnd(const std::string &name, const std::string &message) = 0;
+    };
 
     class Stream {
     public:
@@ -38,7 +45,7 @@ namespace lgx2 {
 
     class Device {
     public:
-        Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput);
+        Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger);
 
         void initialise();
 
@@ -48,6 +55,7 @@ namespace lgx2 {
         Stream *_stream;
         VideoOutput *_videoOutput;
         AudioOutput *_audioOutput;
+        Logger *_logger;
 
         utils::FrameBuilder _frameBuilder;
 

@@ -9,6 +9,7 @@ namespace pulse {
 
 class PulseAudioOutput : public lgx2::AudioOutput {
     public:
+    PulseAudioOutput(std::string pulseAudioSink);
 
     void initialiseAudio() override;
 
@@ -16,6 +17,7 @@ class PulseAudioOutput : public lgx2::AudioOutput {
 
     void render() override;
 private:
+    std::string _pulseAudioSink;
     pa_simple *_pulseAudioHandle;
 };
 

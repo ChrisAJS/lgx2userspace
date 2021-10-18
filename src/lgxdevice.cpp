@@ -3,8 +3,8 @@
 
 namespace lgx2 {
 
-    Device::Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput)
-            : _stream{stream}, _videoOutput{videoOutput}, _audioOutput{audioOutput} {
+    Device::Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger)
+            : _stream{stream}, _videoOutput{videoOutput}, _audioOutput{audioOutput}, _logger{logger} {
         _onFrameData = [&](uint8_t *frameData) {
             onFrameData(frameData);
         };
@@ -19,10 +19,17 @@ namespace lgx2 {
     }
 
     void Device::run() {
+        _logger->logTimeStart("streamUpdate");
         _stream->update();
+        _logger->logTimeEnd("streamUpdate", "Stream update");
 
+        _logger->logTimeStart("videoDisplay");
         _videoOutput->display();
+        _logger->logTimeEnd("videoDisplay", "Video display update");
+
+        _logger->logTimeStart("audioOutput");
         _audioOutput->render();
+        _logger->logTimeEnd("audioOutput", "Audio output render");
     }
 
     void Device::onFrameData(uint8_t *data) {

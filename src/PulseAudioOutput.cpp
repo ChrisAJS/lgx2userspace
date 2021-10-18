@@ -1,6 +1,10 @@
 #include <stdexcept>
 #include "PulseAudioOutput.h"
 
+pulse::PulseAudioOutput::PulseAudioOutput(std::string pulseAudioSink) : _pulseAudioSink{pulseAudioSink} {
+
+}
+
 void pulse::PulseAudioOutput::initialiseAudio() {
 
     static const pa_sample_spec sampleSpec = {
@@ -10,7 +14,7 @@ void pulse::PulseAudioOutput::initialiseAudio() {
     };
 
     /* Create a new playback stream */
-    _pulseAudioHandle = pa_simple_new(nullptr, "LGX2 Userspace driver", PA_STREAM_PLAYBACK, "lgx2", "capture audio", &sampleSpec, nullptr, nullptr, nullptr);
+    _pulseAudioHandle = pa_simple_new(nullptr, "LGX2 Userspace driver", PA_STREAM_PLAYBACK, _pulseAudioSink.c_str(), "capture audio", &sampleSpec, nullptr, nullptr, nullptr);
 }
 
 void pulse::PulseAudioOutput::audioFrameAvailable(uint32_t *audio) {
