@@ -1,11 +1,14 @@
 #include <iostream>
 #include <SDL.h>
+#include <signal.h>
 #include "UsbStream.h"
 #include "SdlFrameOutput.h"
 #include "V4LFrameOutput.h"
 #include "NOOPLogger.h"
 #include "OptionParser.h"
 #include "version.h"
+
+bool do_exit = false;
 
 int main(int argc, char **argv) {
     std::cout << "lgx2userspace v0.0.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
@@ -41,12 +44,20 @@ int main(int argc, char **argv) {
     device.initialise();
 
     SDL_Event event;
-    int do_exit = 0;
+
+    signal(SIGKILL, [](int) {
+        do_exit = true;
+    });
+
+    signal(SIGTERM, [](int) {
+        do_exit = true;
+    });
+
     while (!do_exit) {
 
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                do_exit = 1;
+                do_exit = true;
             }
         }
 
