@@ -23,6 +23,10 @@ namespace sdl {
 
         void render() override;
 
+        void shutdownVideo() override;
+
+        void shutdownAudio() override;
+
     private:
         SDL_Window *_window;
         SDL_Renderer *_renderer;

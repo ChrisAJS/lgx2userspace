@@ -11,7 +11,9 @@ namespace lgx2 {
     class Logger {
     public:
         virtual void logTimeStart(const std::string &name) = 0;
+
         virtual void logTimeEnd(const std::string &name, const std::string &message) = 0;
+
         virtual void summarise() = 0;
     };
 
@@ -22,6 +24,8 @@ namespace lgx2 {
         virtual void queueFrameRead(std::function<void(uint8_t *frameData)> *onData) = 0;
 
         virtual void update() = 0;
+
+        virtual void shutdownStream() = 0;
     };
 
     class VideoOutput {
@@ -31,6 +35,9 @@ namespace lgx2 {
         virtual void videoFrameAvailable(uint32_t *image) = 0;
 
         virtual void display() = 0;
+
+        virtual void shutdownVideo() = 0;
+
     private:
     };
 
@@ -41,6 +48,9 @@ namespace lgx2 {
         virtual void audioFrameAvailable(uint32_t *audio) = 0;
 
         virtual void render() = 0;
+
+        virtual void shutdownAudio() = 0;
+
     private:
     };
 
@@ -51,6 +61,8 @@ namespace lgx2 {
         void initialise();
 
         void run();
+
+        void shutdown();
 
     private:
         Stream *_stream;

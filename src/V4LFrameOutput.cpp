@@ -42,3 +42,7 @@ void v4l::V4LFrameOutput::display() {
         printf("Only wrote %ld bytes (expected %d)\n", bytesWritten, 1920*1080*2);
     }
 }
+
+void v4l::V4LFrameOutput::shutdownVideo() {
+    close(_v4l2fd);
+}

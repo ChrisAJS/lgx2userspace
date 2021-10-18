@@ -16,7 +16,9 @@ namespace libusb {
 
         void onFrameData(libusb_transfer *transfer);
 
-        void queueFutureFrame(libusb_transfer *transfer);
+        void shutdownStream() override;
+
+        void submitTransfer(libusb_transfer *transfer);
 
     private:
         libusb_device_handle *_dev;
@@ -26,6 +28,7 @@ namespace libusb {
         std::function<void(uint8_t*)> *_onFrameDataCallback;
 
         uint8_t *_frameBuffer;
+        bool _shuttingDown;
     };
 }
 

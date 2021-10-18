@@ -1,7 +1,8 @@
 #include <stdexcept>
+#include <utility>
 #include "PulseAudioOutput.h"
 
-pulse::PulseAudioOutput::PulseAudioOutput(std::string pulseAudioSink) : _pulseAudioSink{pulseAudioSink} {
+pulse::PulseAudioOutput::PulseAudioOutput(std::string pulseAudioSink) : _pulseAudioSink{std::move(pulseAudioSink)}, _pulseAudioHandle{nullptr} {
 
 }
 
@@ -13,7 +14,6 @@ void pulse::PulseAudioOutput::initialiseAudio() {
             .channels = 2
     };
 
-    /* Create a new playback stream */
     _pulseAudioHandle = pa_simple_new(nullptr, "LGX2 Userspace driver", PA_STREAM_PLAYBACK, _pulseAudioSink.c_str(), "capture audio", &sampleSpec, nullptr, nullptr, nullptr);
 }
 
@@ -25,4 +25,9 @@ void pulse::PulseAudioOutput::audioFrameAvailable(uint32_t *audio) {
 
 void pulse::PulseAudioOutput::render() {
 
+}
+
+void pulse::PulseAudioOutput::shutdownAudio() {
+    pa_simple_drain(_pulseAudioHandle, nullptr);
+    pa_simple_free(_pulseAudioHandle);
 }

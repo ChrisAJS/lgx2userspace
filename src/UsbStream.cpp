@@ -4,6 +4,7 @@
 #include <exception>
 #include <system_error>
 #include <sstream>
+#include <algorithm>
 
 #include "lgxdevice.h"
 
@@ -16,12 +17,12 @@ static void usbTransferComplete(struct libusb_transfer *transfer) {
         stream->onFrameData(transfer);
     }
 
-    libusb_submit_transfer(transfer);
+    stream->submitTransfer(transfer);
 }
 
 
 namespace libusb {
-    UsbStream::UsbStream() {
+    UsbStream::UsbStream() : _shuttingDown{false} {
         libusb_init(nullptr);
         _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x0551);
 
@@ -29,7 +30,7 @@ namespace libusb {
             throw std::runtime_error("Failed to open lgx2 - is it connected? Run lsusb to check");
         }
 
-        _frameBuffer = new uint8_t[0x1FC000 * 16];
+        _frameBuffer = new uint8_t[0x1FC000 * 8];
 
         if (libusb_set_configuration(_dev, 1) != LIBUSB_SUCCESS) {
             throw std::runtime_error("Failed to set configuration\n");
@@ -89,8 +90,32 @@ namespace libusb {
     }
 
     void UsbStream::onFrameData(libusb_transfer *transfer) {
-        libusb_submit_transfer(transfer);
+        if (!_shuttingDown) {
+            (*_onFrameDataCallback)(transfer->buffer);
+        }
+    }
 
-        (*_onFrameDataCallback)(transfer->buffer);
+    void UsbStream::shutdownStream() {
+
+        _shuttingDown = true;
+
+        while (!_transfers.empty()) {
+            libusb_handle_events(nullptr);
+        }
+
+        delete[] _frameBuffer;
+
+        libusb_release_interface(_dev, 0);
+        libusb_close(_dev);
+    }
+
+    void UsbStream::submitTransfer(libusb_transfer *transfer) {
+        if (!_shuttingDown) {
+            libusb_submit_transfer(transfer);
+        } else {
+            libusb_cancel_transfer(transfer);
+            libusb_free_transfer(transfer);
+            _transfers.erase(std::find(_transfers.begin(), _transfers.end(), transfer));
+        }
     }
 }

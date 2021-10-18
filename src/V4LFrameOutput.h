@@ -15,6 +15,8 @@ namespace v4l {
 
         void display() override;
 
+        void shutdownVideo() override;
+
     private:
         int _v4l2fd;
         uint8_t *_frameBuffer;

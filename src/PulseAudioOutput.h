@@ -9,13 +9,16 @@ namespace pulse {
 
 class PulseAudioOutput : public lgx2::AudioOutput {
     public:
-    PulseAudioOutput(std::string pulseAudioSink);
+    explicit PulseAudioOutput(std::string pulseAudioSink);
 
     void initialiseAudio() override;
 
     void audioFrameAvailable(uint32_t *audio) override;
 
     void render() override;
+
+    void shutdownAudio() override;
+
 private:
     std::string _pulseAudioSink;
     pa_simple *_pulseAudioHandle;

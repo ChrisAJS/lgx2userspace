@@ -1,19 +1,14 @@
 #include <iostream>
 #include <SDL.h>
-#include <getopt.h>
 #include "UsbStream.h"
 #include "SdlFrameOutput.h"
-
-#include "version.h"
 #include "V4LFrameOutput.h"
-#include "PulseAudioOutput.h"
 #include "NOOPLogger.h"
-#include "ChronoLogger.h"
 #include "OptionParser.h"
+#include "version.h"
 
 int main(int argc, char **argv) {
     std::cout << "lgx2userspace v0.0.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
-
 
     app::OptionParser optionParser{};
 
@@ -30,17 +25,14 @@ int main(int argc, char **argv) {
     NOOPLogger noopLogger{};
 
     if (videoOutput == nullptr) {
-        std::cout << "Defaulting to SDL2 video output" << std::endl;
         videoOutput = &sdlOutput;
     }
 
     if (audioOutput == nullptr) {
-        std::cout << "Defaulting to SDL2 audio output" << std::endl;
         audioOutput = &sdlOutput;
     }
 
     if (logger == nullptr) {
-        std::cout << "Defaulting to NOOP Logger" << std::endl;
         logger = &noopLogger;
     }
 
@@ -60,6 +52,8 @@ int main(int argc, char **argv) {
 
         device.run();
     }
+
+    device.shutdown();
 
     logger->summarise();
 

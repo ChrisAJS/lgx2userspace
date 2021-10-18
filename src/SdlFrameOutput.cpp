@@ -64,4 +64,15 @@ namespace sdl {
         // Should be where audio data is written to the audio pipe
     }
 
+    void SdlFrameOutput::shutdownVideo() {
+        SDL_DestroyTexture(_texture);
+        SDL_DestroyRenderer(_renderer);
+        SDL_DestroyWindow(_window);
+    }
+
+    void SdlFrameOutput::shutdownAudio() {
+        SDL_PauseAudioDevice(_audio, 1);
+        SDL_CloseAudioDevice(_audio);
+    }
+
 }

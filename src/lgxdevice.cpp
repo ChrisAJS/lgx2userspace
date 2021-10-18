@@ -75,4 +75,10 @@ namespace lgx2 {
 
         _audioOutput->audioFrameAvailable((uint32_t *) data);
     }
+
+    void Device::shutdown() {
+        _videoOutput->shutdownVideo();
+        _audioOutput->shutdownAudio();
+        _stream->shutdownStream();
+    }
 }
