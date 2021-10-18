@@ -45,6 +45,10 @@ In my limited testing, certain devices may need to be re-plugged in after the ap
 started. For example, a Nintendo Switch will not recognise the LGX2 as an output source until
 it is undocked and re-docked.
 
+### Options when running
+When using the default SDL2 renderer for video output, it is possible to toggle fullscreen
+by pressing `F` and to exit fullscreen by pressing `G`.
+
 ### Gathering diagnostic information
 To help diagnose problems that may be fixed in the future, when submitting an issue
 please try to give as much information about your setup as possible and in the case of
