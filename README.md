@@ -45,6 +45,17 @@ In my limited testing, certain devices may need to be re-plugged in after the ap
 started. For example, a Nintendo Switch will not recognise the LGX2 as an output source until
 it is undocked and re-docked.
 
+### Gathering diagnostic information
+To help diagnose problems that may be fixed in the future, when submitting an issue
+please try to give as much information about your setup as possible and in the case of
+inadequate video or audio output, run the userspace driver with the `-v` switch enabled.
+
+With the `-v` switch enabled, the driver will output information regarding time taken to
+process frame data and time taken to render both audio and video.
+
+This information could be valuable when identifying issues so please try your best to include it
+in any issues you raise, thank you!
+
 ## Running with V4L2 Output and Pulseaudio Output
 ### V4L2 Output setup
 To output video to a virtual webcam output source, load the V4L2 Loopback Linux module with an easy to identify device
@@ -72,10 +83,16 @@ This will create an audio sink called `LGX2 Audio Sink` which can be added to OB
 **NOTE: The best way to control the audio volume is to use the gain OBS filter whilst leaving the sink volume at max.**
 
 ### Running with configure V4L2 device
-Simply run the userspace driver with the V4L2 device:
+Run the userspace driver with the `-d` option to specify which V4L2Loopback device to use:
 
 ```bash
-./lgx2userspace /dev/video99
+./lgx2userspace -d /dev/video99
+```
+
+To run using the Pulseaudio sink that you created, use the `-a` switch with the name of the sink:
+
+```bash
+./lgx2userspace -a lgx2
 ```
 
 **NOTE: You may need to unplug and replug in your video source.**
