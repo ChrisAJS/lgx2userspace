@@ -1,8 +1,8 @@
-# LGX2 Userspace driver
+# LGX2 Userspace driver (with LGX support)
 This software is little more than a POC and no guarantees of functionality are given and it may even be dangerous to use this software. Please
 consider contacting AverMedia for a supported Linux driver.
 
-This project contains a userspace driver for the [AverMedia LGX2 (GC551)](https://avermedia.com/LGX2).
+This project contains a userspace driver for the [AverMedia LGX2 (GC551)](https://avermedia.com/LGX2) as well support for the [AverMedia LGX (GC550)](https://avermedia.com/LGX).
 
 It can be used to display the captured video and audio in a standalone window or
 to forward the captured video and audio to a virtual video capture device.
@@ -24,25 +24,28 @@ make
 ```
 
 ## Setup
-The userspace driver will require read and write access to the LGX2. On a Linux
-system, this can be granted to the user by adding the following rule to Udev.
+The userspace driver will require read and write access to the LGX/LGX2. 
+
+On a Linux system, this can be granted to the user by adding the following rules to Udev.
 
 ```bash
-sudo echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="07ca", ATTRS{idProduct}=="0551", MODE="0666"' > /etc/udev/rules.d/999-avermedia.rules
+sudo cp 999-avermedia.rules /etc/udev/rules.d/999-avermedia.rules
 sudo udevadm control --reload-rules
 ```
 
-After the rule has been added, unplug and re-plug in the LGX2.
+After the rule has been added, unplug and re-plug in the LGX/LGX2.
 
 ## Running
 Once udev has been configured to grant read and write permission to the device it
 will be possible to run the application by executing `lgx2userspace`.
 
+If you are using the LGX GC550, use the command line option `x` - `./lgx2userspace -x`.
+
 The application will take a few seconds to run as it streams setup information to the device, 
 and it will eventually display a window that will then start to display captured frames.
 
 In my limited testing, certain devices may need to be re-plugged in after the application has 
-started. For example, a Nintendo Switch will not recognise the LGX2 as an output source until
+started. For example, a Nintendo Switch will not recognise the LGX/LGX2 as an output source until
 it is undocked and re-docked.
 
 ### Options when running
@@ -84,6 +87,7 @@ pactl load-module module-remap-source master=lgx2.monitor source_name=lgx2 sourc
 ```
 This will create an audio sink called `LGX2 Audio Sink` which can be added to OBS as a Pulseaudio output capture device.
 
+**NOTE: Even if you are using the LGX GC550- leaving the names as lgx2 is required and will not affect behaviour.**
 **NOTE: The best way to control the audio volume is to use the gain OBS filter whilst leaving the sink volume at max.**
 
 ### Running with configure V4L2 device
