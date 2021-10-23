@@ -2,6 +2,7 @@
 #define LGX2USERSPACE_OPTIONPARSER_H
 
 #include "lgxdevice.h"
+#include "UsbStream.h"
 
 namespace app {
     class OptionParser {
@@ -11,11 +12,13 @@ namespace app {
         lgx2::VideoOutput *videoOutput();
         lgx2::AudioOutput *audioOutput();
         lgx2::Logger *logger();
+        libusb::LGXDeviceType deviceType();
 
     private:
         lgx2::VideoOutput *_videoOutput;
         lgx2::AudioOutput *_audioOutput;
         lgx2::Logger *_logger;
+        libusb::LGXDeviceType _deviceType{libusb::LGXDeviceType::LGX2};
     };
 }
 

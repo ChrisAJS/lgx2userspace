@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
     lgx2::VideoOutput *videoOutput{optionParser.videoOutput()};
     lgx2::AudioOutput *audioOutput{optionParser.audioOutput()};
 
-    libusb::UsbStream stream{};
+    libusb::UsbStream stream{optionParser.deviceType()};
     sdl::SdlFrameOutput sdlOutput = sdl::SdlFrameOutput();
     NOOPLogger noopLogger{};
 

@@ -8,7 +8,8 @@
 
 #include "lgxdevice.h"
 
-#include "commanddata.h"
+#include "commanddata_lgx2.h"
+#include "commanddata_lgx.h"
 
 static void usbTransferComplete(struct libusb_transfer *transfer) {
     auto *stream = static_cast<libusb::UsbStream *>(transfer->user_data);
@@ -22,9 +23,13 @@ static void usbTransferComplete(struct libusb_transfer *transfer) {
 
 
 namespace libusb {
-    UsbStream::UsbStream() : _shuttingDown{false} {
+    UsbStream::UsbStream(LGXDeviceType deviceType) : _deviceType{deviceType}, _shuttingDown{false} {
         libusb_init(nullptr);
-        _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x0551);
+        if (_deviceType == LGXDeviceType::LGX2) {
+            _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x0551);
+        } else {
+            _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x4710);
+        }
 
         if (_dev == nullptr) {
             throw std::runtime_error("Failed to open lgx2 - is it connected? Run lsusb to check");
@@ -44,7 +49,14 @@ namespace libusb {
     void UsbStream::streamSetupCommands() {
         int actualLength;
         uint8_t transferBuffer[512]{0};
-        auto commands = std::istringstream{bin2c_commands_txt};
+        std::string targetCommands;
+        if (_deviceType == LGXDeviceType::LGX2) {
+            targetCommands = lgx2_setup_commands;
+        } else {
+            targetCommands = lgx_setup_commands;
+        }
+
+        auto commands = std::istringstream{targetCommands};
         std::string command;
         while (commands >> command) {
             if (command[0] == '>') {

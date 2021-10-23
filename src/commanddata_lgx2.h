@@ -4,6 +4,6 @@
 
 #include <string>
 
-extern std::string bin2c_commands_txt;
+extern std::string lgx2_setup_commands;
 
 #endif /* COMMANDDATA_H */
