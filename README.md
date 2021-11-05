@@ -11,14 +11,14 @@ to forward the captured video and audio to a virtual video capture device.
 To build the project, you will need:
 * CMake
 * Libusb
+* Libpcap
 * SDL2
 * V4L2Loopback
 
 Execute the following commands to build in the root of the project:
 
 ```bash
-mkdir build
-cd build
+mkdir build && cd build
 cmake ..
 make
 ```
