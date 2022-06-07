@@ -15,6 +15,16 @@ To build the project, you will need:
 * SDL2
 * V4L2Loopback
 
+### Ubuntu 22.04
+The following packages need to be installed to be able to build this project:
+
+```bash
+sudo apt install cmake libusb-dev libsdl2-dev libsdl2-gfx-dev libpulse-dev v4l2loopback-dkms v4l2loopback-utils
+```
+
+With these dependencies installed it should be possible to build the application.
+
+### Build Command
 Execute the following commands to build in the root of the project:
 
 ```bash

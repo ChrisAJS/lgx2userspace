@@ -1,6 +1,6 @@
 #include <iostream>
 #include <SDL.h>
-#include <signal.h>
+#include <csignal>
 #include "UsbStream.h"
 #include "SdlFrameOutput.h"
 #include "V4LFrameOutput.h"
