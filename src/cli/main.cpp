@@ -1,17 +1,13 @@
 #include <iostream>
-#include <SDL.h>
 #include <csignal>
-#include "UsbStream.h"
-#include "SdlFrameOutput.h"
-#include "V4LFrameOutput.h"
-#include "NOOPLogger.h"
+#include <liblgx.h>
 #include "OptionParser.h"
-#include "version.h"
+#include "../version.h"
 
 bool do_exit = false;
 
 int main(int argc, char **argv) {
-    std::cout << "lgx2userspace v0.0.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
+    std::cout << "lgx2userspace v0.1.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
 
     app::OptionParser optionParser{};
 

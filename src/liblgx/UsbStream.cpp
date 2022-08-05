@@ -32,7 +32,7 @@ namespace libusb {
         }
 
         if (_dev == nullptr) {
-            throw std::runtime_error("Failed to open lgx2 - is it connected? Run lsusb to check");
+            throw std::runtime_error("Failed to open lgx/lgx2 - is it connected? Run lsusb to check and ensure you have installed the udev rules (and restarted udev if necessary!)");
         }
 
         _frameBuffer = new uint8_t[0x1FC000 * 8];
@@ -42,7 +42,7 @@ namespace libusb {
         }
 
         if (libusb_claim_interface(_dev, 0) != LIBUSB_SUCCESS) {
-            throw std::runtime_error("Could not claim interface for lgx2 - is something else using the device?\n");
+            throw std::runtime_error("Could not claim interface for lgx/lgx2 - is something else using the device?\n");
         }
     }
 

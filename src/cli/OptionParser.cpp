@@ -1,9 +1,9 @@
 #include <getopt.h>
 #include <iostream>
 #include "OptionParser.h"
-#include "PulseAudioOutput.h"
-#include "ChronoLogger.h"
-#include "V4LFrameOutput.h"
+#include "../liblgx/pulseaudio/PulseAudioOutput.h"
+#include "logging/ChronoLogger.h"
+#include "../liblgx/v4l/V4LFrameOutput.h"
 
 lgx2::VideoOutput *app::OptionParser::videoOutput() {
     return _videoOutput;

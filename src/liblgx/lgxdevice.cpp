@@ -1,4 +1,3 @@
-#include <cstdio>
 #include "lgxdevice.h"
 
 #include <chrono>

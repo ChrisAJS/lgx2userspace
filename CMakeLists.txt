@@ -3,13 +3,11 @@ project(lgx2userspace)
 
 set(CMAKE_CXX_STANDARD 14)
 
+add_subdirectory(src/liblgx)
+add_subdirectory(src/cli)
+add_subdirectory(src/gtk)
+
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-
-add_executable(lgx2userspace src/main.cpp src/lgxdevice.cpp src/lgxdevice.h src/commanddata_lgx2.cpp src/commanddata_lgx2.h src/commanddata_lgx.cpp src/commanddata_lgx.h src/UsbStream.cpp src/UsbStream.h src/SdlFrameOutput.cpp src/SdlFrameOutput.h src/FrameBuilder.cpp src/FrameBuilder.h src/V4LFrameOutput.cpp src/V4LFrameOutput.h src/PulseAudioOutput.cpp src/PulseAudioOutput.h src/NOOPLogger.cpp src/NOOPLogger.h src/ChronoLogger.cpp src/ChronoLogger.h src/OptionParser.cpp src/OptionParser.h)
-
-target_include_directories(lgx2userspace PRIVATE /usr/include/SDL2)
-
-target_link_libraries(lgx2userspace PRIVATE usb-1.0 pthread SDL2_gfx SDL2 pulse-simple)
 
 add_executable(usbsneef utils/usbsneef.c)
 

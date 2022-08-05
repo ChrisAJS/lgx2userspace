@@ -46,12 +46,4 @@ namespace utils {
         return _audioFrame;
     }
 
-    bool FrameBuilder::buildingVideoFrame() {
-        return _videoOffset != 0;
-    }
-
-    uint32_t FrameBuilder::blocksUntilVideoComplete() {
-        return 1920 * 1080 - _videoOffset;
-    }
-
 }

@@ -12,9 +12,6 @@ namespace utils {
         uint32_t *completeVideoFrame();
         uint32_t *completeAudioFrame();
 
-        bool buildingVideoFrame();
-
-        uint32_t blocksUntilVideoComplete();
     private:
         uint32_t *_videoFrame;
         uint32_t *_audioFrame;

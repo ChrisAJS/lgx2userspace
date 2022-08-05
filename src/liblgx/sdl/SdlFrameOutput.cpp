@@ -10,8 +10,11 @@ namespace sdl {
 
     void SdlFrameOutput::initialiseVideo() {
         _window = SDL_CreateWindow("lgx2userspace", 1920, 100, 1920, 1080, 0);
-
         _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
+
+        SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
+        SDL_RenderClear(_renderer);
+        SDL_RenderPresent(_renderer);
 
         _texture = SDL_CreateTexture(
                 _renderer,
@@ -35,15 +38,17 @@ namespace sdl {
     }
 
     void SdlFrameOutput::videoFrameAvailable(uint32_t *image) {
-        uint16_t *pixels;
+        uint16_t *pixels{nullptr};
         int32_t pitch;
-        SDL_LockTexture(_texture, nullptr, (void **) &pixels, &pitch);
-        memcpy(pixels, image, 1920 * 1080 * 2);
+        int result = SDL_LockTexture(_texture, nullptr, (void **) &pixels, &pitch);
+        if (pixels != nullptr && result == 0) {
+            memcpy(pixels, image, 1920 * 1080 * 2);
+        }
         SDL_UnlockTexture(_texture);
     }
 
     void SdlFrameOutput::audioFrameAvailable(uint32_t *audio) {
-        SDL_QueueAudio(_audio, audio, 800*4);
+        SDL_QueueAudio(_audio, audio, 800 * 4);
     }
 
     void SdlFrameOutput::display() {
@@ -55,7 +60,7 @@ namespace sdl {
         } else if (keyboardState[SDL_SCANCODE_G]) {
             SDL_SetWindowFullscreen(_window, 0);
         }
-        
+
         SDL_RenderCopy(_renderer, _texture, nullptr, nullptr);
         SDL_RenderPresent(_renderer);
     }
