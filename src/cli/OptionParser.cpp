@@ -41,7 +41,7 @@ bool app::OptionParser::process(int argc, char **argv) {
                 continue;
             case 'x':
                 std::cout << "Using the LGX GC550 support" << std::endl;
-                _deviceType = libusb::LGXDeviceType::LGX;
+                _deviceType = lgx2::DeviceType::LGX;
                 continue;
             case 'h':
             default :
@@ -57,6 +57,6 @@ bool app::OptionParser::process(int argc, char **argv) {
     return true;
 }
 
-libusb::LGXDeviceType app::OptionParser::deviceType() {
+lgx2::DeviceType app::OptionParser::deviceType() {
     return _deviceType;
 }

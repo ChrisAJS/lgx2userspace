@@ -8,12 +8,12 @@ set(LIBLGX_BASE_SOURCES
         liblgx.h
         lgxdevice.cpp
         lgxdevice.h
-        commanddata_lgx2.cpp
-        commanddata_lgx2.h
-        commanddata_lgx.cpp
-        commanddata_lgx.h
-        UsbStream.cpp
-        UsbStream.h
+        bootstrap/commanddata_lgx2.cpp
+        bootstrap/commanddata_lgx2.h
+        bootstrap/commanddata_lgx.cpp
+        bootstrap/commanddata_lgx.h
+        usb/UsbStream.cpp
+        usb/UsbStream.h
         FrameBuilder.cpp
         FrameBuilder.h)
 

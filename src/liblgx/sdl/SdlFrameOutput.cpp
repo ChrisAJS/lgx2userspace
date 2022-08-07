@@ -9,7 +9,7 @@ namespace sdl {
     }
 
     void SdlFrameOutput::initialiseVideo() {
-        _window = SDL_CreateWindow("lgx2userspace", 1920, 100, 1920, 1080, 0);
+        _window = SDL_CreateWindow("lgx2userspace", 1920, 100, 1920, 1080, SDL_WINDOW_RESIZABLE);
         _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
 
         SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);

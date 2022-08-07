@@ -3,7 +3,7 @@
 
 #include <SDL.h>
 #include "lgxdevice.h"
-#include "UsbStream.h"
+#include "usb/UsbStream.h"
 #include "sdl/SdlFrameOutput.h"
 #include "logging/ChronoLogger.h"
 #include  "logging/NOOPLogger.h"

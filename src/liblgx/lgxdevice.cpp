@@ -12,11 +12,15 @@ namespace lgx2 {
         };
     }
 
-    void Device::initialise() {
+    bool Device::isDeviceAvailable(DeviceType device) {
+        return _stream->deviceAvailable(device);
+    }
+
+    void Device::initialise(lgx2::DeviceType deviceType) {
         _videoOutput->initialiseVideo();
         _audioOutput->initialiseAudio();
 
-        _stream->streamSetupCommands();
+        _stream->streamSetupCommands(deviceType);
         _stream->queueFrameRead(&_onFrameData);
     }
 

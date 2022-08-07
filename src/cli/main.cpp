@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
     lgx2::VideoOutput *videoOutput{optionParser.videoOutput()};
     lgx2::AudioOutput *audioOutput{optionParser.audioOutput()};
 
-    libusb::UsbStream stream{optionParser.deviceType()};
+    libusb::UsbStream stream{};
     sdl::SdlFrameOutput sdlOutput = sdl::SdlFrameOutput();
     NOOPLogger noopLogger{};
 
@@ -37,7 +37,15 @@ int main(int argc, char **argv) {
 
     lgx2::Device device{&stream, videoOutput, audioOutput, logger};
 
-    device.initialise();
+    if (device.isDeviceAvailable(lgx2::DeviceType::LGX)) {
+        printf("LGX (GC550) is available\n");
+    }
+
+    if (device.isDeviceAvailable(lgx2::DeviceType::LGX2)) {
+        printf("LGX2 (GC551) is available\n");
+    }
+
+    device.initialise(optionParser.deviceType());
 
     SDL_Event event;
 

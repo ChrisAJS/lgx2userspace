@@ -8,6 +8,11 @@
 
 namespace lgx2 {
 
+    enum class DeviceType {
+        LGX,
+        LGX2
+    };
+
     class Logger {
     public:
         virtual void logTimeStart(const std::string &name) = 0;
@@ -19,7 +24,9 @@ namespace lgx2 {
 
     class Stream {
     public:
-        virtual void streamSetupCommands() = 0;
+        virtual bool deviceAvailable(DeviceType deviceType) = 0;
+
+        virtual void streamSetupCommands(DeviceType deviceType) = 0;
 
         virtual void queueFrameRead(std::function<void(uint8_t *frameData)> *onData) = 0;
 
@@ -58,7 +65,9 @@ namespace lgx2 {
     public:
         Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger);
 
-        void initialise();
+        bool isDeviceAvailable(DeviceType deviceType);
+
+        void initialise(DeviceType deviceType);
 
         void run();
 

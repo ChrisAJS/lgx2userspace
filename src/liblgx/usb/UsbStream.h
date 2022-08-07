@@ -7,17 +7,12 @@
 
 namespace libusb {
 
-    enum class LGXDeviceType {
-        LGX,
-        LGX2
-    };
-
-
     class UsbStream : public lgx2::Stream {
     public:
-        UsbStream(LGXDeviceType targetDevice);
+        explicit UsbStream();
 
-        void streamSetupCommands() override;
+        bool deviceAvailable(lgx2::DeviceType deviceType) override;
+        void streamSetupCommands(lgx2::DeviceType deviceType) override;
         void queueFrameRead(std::function<void(uint8_t *)> *onData) override;
         void update() override;
 
@@ -28,11 +23,11 @@ namespace libusb {
         void submitTransfer(libusb_transfer *transfer);
 
     private:
-        LGXDeviceType _deviceType;
-
         libusb_device_handle *_dev;
 
         std::vector<libusb_transfer*> _transfers;
+
+        std::vector<lgx2::DeviceType> _availableDevices;
 
         std::function<void(uint8_t*)> *_onFrameDataCallback;
 

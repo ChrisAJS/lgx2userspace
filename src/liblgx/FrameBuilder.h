@@ -13,8 +13,8 @@ namespace utils {
         uint32_t *completeAudioFrame();
 
     private:
-        uint32_t *_videoFrame;
-        uint32_t *_audioFrame;
+        uint32_t _videoFrame[1920 * 1080];
+        uint32_t _audioFrame[800];
 
         uint32_t _videoOffset;
         uint32_t _audioOffset;
