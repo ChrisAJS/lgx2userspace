@@ -37,15 +37,21 @@ int main(int argc, char **argv) {
 
     lgx2::Device device{&stream, videoOutput, audioOutput, logger};
 
-    if (device.isDeviceAvailable(lgx2::DeviceType::LGX)) {
-        printf("LGX (GC550) is available\n");
+    bool lgxAvailable = device.isDeviceAvailable(lgx2::DeviceType::LGX);
+    bool lgx2Available = device.isDeviceAvailable(lgx2::DeviceType::LGX2);
+    lgx2::DeviceType targetDevice = optionParser.deviceType();
+
+    if (lgxAvailable && lgx2Available) {
+        printf("Unable to auto detect which device to use as both LGX and LGX2 available - will use as indicated by the -x argument.\n");
+    } else {
+        if (lgxAvailable) {
+            targetDevice = lgx2::DeviceType::LGX;
+        } else if (lgx2Available) {
+            targetDevice = lgx2::DeviceType::LGX2;
+        }
     }
 
-    if (device.isDeviceAvailable(lgx2::DeviceType::LGX2)) {
-        printf("LGX2 (GC551) is available\n");
-    }
-
-    device.initialise(optionParser.deviceType());
+    device.initialise(targetDevice);
 
     SDL_Event event;
 
