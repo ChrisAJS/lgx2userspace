@@ -5,7 +5,11 @@
 #include "lgxdevice.h"
 #include "usb/UsbStream.h"
 #include "sdl/SdlFrameOutput.h"
+#include "pulseaudio/PulseAudioOutput.h"
+#include "NullAudioOutput.h"
+#include "NullVideoOutput.h"
+#include "v4l/V4LFrameOutput.h"
 #include "logging/ChronoLogger.h"
-#include  "logging/NOOPLogger.h"
+#include "logging/NOOPLogger.h"
 
 #endif //LGX2USERSPACE_LIBLGX_H

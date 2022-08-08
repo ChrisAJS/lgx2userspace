@@ -15,7 +15,11 @@ set(LIBLGX_BASE_SOURCES
         usb/UsbStream.cpp
         usb/UsbStream.h
         FrameBuilder.cpp
-        FrameBuilder.h)
+        FrameBuilder.h
+        NullVideoOutput.cpp
+        NullVideoOutput.h
+        NullAudioOutput.cpp
+        NullAudioOutput.h)
 
 set(LOGGER_SOURCES
         logging/NOOPLogger.cpp
