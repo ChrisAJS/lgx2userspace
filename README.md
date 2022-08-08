@@ -133,3 +133,13 @@ Go to OBS or other streaming software and select the LGX2 V4L2 source. You shoul
 
 ## Demo
 See it in action over at [YouTube](https://www.youtube.com/watch?v=-yzHMbUn-w0).
+
+# Attributions
+This project uses the hard work of the following projects:
+
+ * [libusb](https://libusb.info/)
+ * [V4L2Loopback](https://github.com/umlaeute/v4l2loopback)
+ * [SDL](https://www.libsdl.org/)
+ * [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/)
+ * [GTK+](https://www.gtk.org/)
+ * [Catch2](https://github.com/catchorg/Catch2)
