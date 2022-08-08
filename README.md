@@ -16,15 +16,21 @@ To build the project, you will need:
 * V4L2Loopback
 
 ### Ubuntu 22.04
-The following packages need to be installed to be able to build this project:
+The following packages need to be installed:
 
 ```bash
 sudo apt install cmake libusb-dev libsdl2-dev libsdl2-gfx-dev libpulse-dev v4l2loopback-dkms v4l2loopback-utils
 ```
+### Arch Linux (Unconfirmed)
+The following packages need to be installed:
 
-With these dependencies installed it should be possible to build the application.
+```bash
+sudo pacman -S cmake libusb sdl2 sdl2_gfx libpulse v4l2loopback-dkms v4l2loopback-utils
+```
 
 ### Build Command
+With the dependencies installed for your environment it should be possible to build the application.
+
 Execute the following commands to build in the root of the project:
 
 ```bash
@@ -57,6 +63,14 @@ and it will eventually display a window that will then start to display captured
 In my limited testing, certain devices may need to be re-plugged in after the application has 
 started. For example, a Nintendo Switch will not recognise the LGX/LGX2 as an output source until
 it is undocked and re-docked.
+
+### Common issues
+On occasion the LGX or LGX2 will fail to retrieve full frames. It may be required to unplug and re-plug the HDMI cable
+into the input of the device.
+
+If you attempt to run the application and it exits immediately, look at the error output, it may help diagnose the issue,
+which will likely be that you haven't installed the udev rules required to give your user permission to access the LGX or
+LGX2 without root access.
 
 ### Options when running
 When using the default SDL2 renderer for video output, it is possible to toggle fullscreen

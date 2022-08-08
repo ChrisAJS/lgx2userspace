@@ -8,8 +8,8 @@
 
 #include "lgxdevice.h"
 
-#include "commanddata_lgx2.h"
-#include "commanddata_lgx.h"
+#include "bootstrap/commanddata_lgx2.h"
+#include "bootstrap/commanddata_lgx.h"
 
 static void usbTransferComplete(struct libusb_transfer *transfer) {
     auto *stream = static_cast<libusb::UsbStream *>(transfer->user_data);
@@ -23,34 +23,70 @@ static void usbTransferComplete(struct libusb_transfer *transfer) {
 
 
 namespace libusb {
-    UsbStream::UsbStream(LGXDeviceType deviceType) : _deviceType{deviceType}, _shuttingDown{false} {
+    static const int LGX_DATA_FRAME_LEN = 0x1FC000;
+
+    UsbStream::UsbStream() : _dev{nullptr}, _onFrameDataCallback{}, _shuttingDown{false} {
         libusb_init(nullptr);
-        if (_deviceType == LGXDeviceType::LGX2) {
+
+
+        libusb_device **list = nullptr;
+        ssize_t count = libusb_get_device_list(nullptr, &list);
+
+        for (size_t idx = 0; idx < count; ++idx) {
+            libusb_device *device = list[idx];
+            libusb_device_descriptor desc = {0};
+
+            libusb_get_device_descriptor(device, &desc);
+            if (desc.idVendor == 0x07ca) {
+                if (desc.idProduct == 0x0551) {
+                    printf("LGX2 (GC551) detected\n");
+                    _availableDevices.push_back(lgx2::DeviceType::LGX2);
+                } else if (desc.idProduct == 0x4710){
+                    printf("LGX (GC550) detected\n");
+                    _availableDevices.push_back(lgx2::DeviceType::LGX);
+                }
+            }
+        }
+
+        libusb_free_device_list(list, (int) count);
+        _frameBuffer = new uint8_t[LGX_DATA_FRAME_LEN * 8];
+    }
+
+    bool UsbStream::deviceAvailable(lgx2::DeviceType deviceType) {
+        return std::find(_availableDevices.begin(), _availableDevices.end(), deviceType) != _availableDevices.end();
+    }
+
+    void UsbStream::streamSetupCommands(lgx2::DeviceType deviceType) {
+        if (deviceType == lgx2::DeviceType::LGX2) {
             _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x0551);
         } else {
             _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x4710);
         }
 
         if (_dev == nullptr) {
-            throw std::runtime_error("Failed to open lgx2 - is it connected? Run lsusb to check");
+            throw std::runtime_error(
+                    "Failed to open lgx/lgx2 - is it connected? Run lsusb to check and ensure you have installed the udev rules (and restarted udev if necessary!)");
         }
-
-        _frameBuffer = new uint8_t[0x1FC000 * 8];
 
         if (libusb_set_configuration(_dev, 1) != LIBUSB_SUCCESS) {
             throw std::runtime_error("Failed to set configuration\n");
         }
 
         if (libusb_claim_interface(_dev, 0) != LIBUSB_SUCCESS) {
-            throw std::runtime_error("Could not claim interface for lgx2 - is something else using the device?\n");
+            throw std::runtime_error("Could not claim interface for lgx/lgx2 - is something else using the device?\n");
         }
-    }
 
-    void UsbStream::streamSetupCommands() {
+        int check = 0;
+        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x03, _frameBuffer, LGX_DATA_FRAME_LEN, &check, 100);
+        if (res != LIBUSB_ERROR_TIMEOUT) {
+            printf("Skipping bootsrap - device is already producing framedata\n");
+            return;
+        }
+
         int actualLength;
         uint8_t transferBuffer[512]{0};
         std::string targetCommands;
-        if (_deviceType == LGXDeviceType::LGX2) {
+        if (deviceType == lgx2::DeviceType::LGX2) {
             targetCommands = lgx2_setup_commands;
         } else {
             targetCommands = lgx_setup_commands;
@@ -86,8 +122,8 @@ namespace libusb {
             libusb_transfer *transfer = libusb_alloc_transfer(0);
 
             libusb_fill_bulk_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
-                                             _frameBuffer + 0x1FC000 * i, 0x1FC000,
-                                             usbTransferComplete, this, 0);
+                                      _frameBuffer + LGX_DATA_FRAME_LEN * i, LGX_DATA_FRAME_LEN,
+                                      usbTransferComplete, this, 0);
 
             _transfers.push_back(transfer);
         }
