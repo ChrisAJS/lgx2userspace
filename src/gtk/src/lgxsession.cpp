@@ -4,7 +4,8 @@
 #include <gtk/gtk.h>
 #include "lgxsession.h"
 
-void onDrawingAreaDraw(GtkDrawingArea *drawingArea, cairo_t *cairoContext, int width, int height, gpointer data) {
+void onDrawingAreaDraw(__attribute__((unused)) GtkDrawingArea *drawingArea, cairo_t *cairoContext,
+                       __attribute__((unused)) int width, __attribute__((unused)) int height, gpointer data) {
     auto *lgxSession = (LGXSession *) data;
     GdkPixbuf *frame = lgxSession->frame();
 
@@ -12,7 +13,10 @@ void onDrawingAreaDraw(GtkDrawingArea *drawingArea, cairo_t *cairoContext, int w
     cairo_paint(cairoContext);
 }
 
-void onDrawingAreaDrawPlaceholder(GtkDrawingArea *drawingArea, cairo_t *cairoContext, int width, int height, gpointer data) {
+void
+onDrawingAreaDrawPlaceholder(__attribute__((unused)) GtkDrawingArea *drawingArea, cairo_t *cairoContext,
+                             __attribute__((unused)) int width, __attribute__((unused)) int height,
+                             __attribute__((unused)) gpointer data) {
     cairo_set_source_rgb(cairoContext, 0.2, 0.2, 0.2);
     cairo_fill(cairoContext);
     cairo_paint(cairoContext);

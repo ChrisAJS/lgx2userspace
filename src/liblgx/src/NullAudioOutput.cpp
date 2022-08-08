@@ -4,7 +4,7 @@ void NullAudioOutput::initialiseAudio() {
 
 }
 
-void NullAudioOutput::audioFrameAvailable(uint32_t *audio) {
+void NullAudioOutput::audioFrameAvailable(uint32_t *) {
 
 }
 

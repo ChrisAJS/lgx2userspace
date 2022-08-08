@@ -28,13 +28,12 @@ namespace libusb {
     UsbStream::UsbStream() : _dev{nullptr}, _onFrameDataCallback{}, _shuttingDown{false} {
         libusb_init(nullptr);
 
-
         libusb_device **list = nullptr;
         ssize_t count = libusb_get_device_list(nullptr, &list);
 
-        for (size_t idx = 0; idx < count; ++idx) {
+        for (ssize_t idx = 0; idx < count; ++idx) {
             libusb_device *device = list[idx];
-            libusb_device_descriptor desc = {0};
+            libusb_device_descriptor desc{};
 
             libusb_get_device_descriptor(device, &desc);
             if (desc.idVendor == 0x07ca) {
@@ -50,6 +49,10 @@ namespace libusb {
 
         libusb_free_device_list(list, (int) count);
         _frameBuffer = new uint8_t[LGX_DATA_FRAME_LEN * 8];
+    }
+
+    UsbStream::~UsbStream() {
+        libusb_exit(nullptr);
     }
 
     bool UsbStream::deviceAvailable(lgx2::DeviceType deviceType) {
@@ -96,8 +99,8 @@ namespace libusb {
         std::string command;
         while (commands >> command) {
             if (command[0] == '>') {
-                unsigned long commandLength = (command.length() - 1) / 2;
-                for (unsigned long i = 0; i < commandLength; i++) {
+                int commandLength = (int)(command.length() - 1) / 2;
+                for (int i = 0; i < commandLength; i++) {
                     transferBuffer[i] = std::stoi(command.substr(1 + i * 2, 2), nullptr, 16);
                 }
                 libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, transferBuffer, static_cast<int>(commandLength),

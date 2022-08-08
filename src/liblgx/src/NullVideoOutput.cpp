@@ -4,7 +4,7 @@ void NullVideoOutput::initialiseVideo() {
 
 }
 
-void NullVideoOutput::videoFrameAvailable(uint32_t *image) {
+void NullVideoOutput::videoFrameAvailable(uint32_t *) {
 
 }
 

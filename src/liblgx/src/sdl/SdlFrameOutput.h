@@ -2,7 +2,7 @@
 #define LGX2USERSPACE_SDLFRAMEOUTPUT_H
 
 
-#include "../lgxdevice.h"
+#include "lgxdevice.h"
 #include <SDL.h>
 
 namespace sdl {

@@ -20,7 +20,7 @@ void stopStream() {
     session->stopCapture();
 }
 
-static void activate(GtkApplication *app, gpointer userData) {
+static void activate(GtkApplication *app, __attribute__((unused)) gpointer userData) {
     GtkWidget *window;
 
     window = gtk_application_window_new(app);

@@ -1,7 +1,7 @@
 #ifndef LGX2USERSPACE_PULSEAUDIOOUTPUT_H
 #define LGX2USERSPACE_PULSEAUDIOOUTPUT_H
 
-#include "../lgxdevice.h"
+#include "lgxdevice.h"
 #include <pulse/pulseaudio.h>
 #include <pulse/simple.h>
 

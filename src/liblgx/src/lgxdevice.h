@@ -24,6 +24,7 @@ namespace lgx2 {
 
     class Stream {
     public:
+        virtual ~Stream() = default;
         virtual bool deviceAvailable(DeviceType deviceType) = 0;
 
         virtual void streamSetupCommands(DeviceType deviceType) = 0;

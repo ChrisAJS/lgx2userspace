@@ -2,7 +2,7 @@
 #define LGX2USERSPACE_V4LFRAMEOUTPUT_H
 
 #include <string>
-#include "../lgxdevice.h"
+#include "lgxdevice.h"
 
 namespace v4l {
     class V4LFrameOutput : public lgx2::VideoOutput {

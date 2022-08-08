@@ -1,8 +1,7 @@
 #ifndef LGX2USERSPACE_OPTIONPARSER_H
 #define LGX2USERSPACE_OPTIONPARSER_H
 
-#include "../liblgx/lgxdevice.h"
-#include "usb/UsbStream.h"
+#include <liblgx.h>
 
 namespace app {
     class OptionParser {
