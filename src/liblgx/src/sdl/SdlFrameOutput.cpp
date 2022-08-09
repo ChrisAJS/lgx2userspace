@@ -1,6 +1,6 @@
 #include "SdlFrameOutput.h"
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 namespace sdl {
 

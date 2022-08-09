@@ -2,6 +2,7 @@
 #define LGX2USERSPACE_FRAMEBUILDER_H
 
 #include <cstdint>
+#include <memory>
 
 namespace utils {
     class FrameBuilder {
@@ -19,8 +20,8 @@ namespace utils {
         const static uint32_t AUDIO_FRAME_START_MARKER = 0xAA5555AA;
 
     private:
-        uint32_t _videoFrame[1920 * 1080];
-        uint32_t _audioFrame[800];
+        uint32_t* _videoFrame;
+        uint32_t* _audioFrame;
 
         uint32_t _videoOffset;
         uint32_t _audioOffset;

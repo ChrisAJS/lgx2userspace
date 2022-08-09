@@ -7,7 +7,7 @@ namespace utils {
         return (a < b) ? a : b;
     }
 
-    FrameBuilder::FrameBuilder() : _videoFrame{0}, _audioFrame{0},
+    FrameBuilder::FrameBuilder() : _videoFrame{new uint32_t[1920*1080]}, _audioFrame{new uint32_t[800]},
                                    _videoOffset{0}, _audioOffset{0} {
 
     }

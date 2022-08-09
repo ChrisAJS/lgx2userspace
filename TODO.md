@@ -4,6 +4,6 @@ of things that need looking into:
  
 * Mac OS X support [ ]
 * Correct CMake build files that don't reference user specific paths [ ]
-* Windows support [ ]
+* Windows support [/]
 * Low resolution(?) support [ ]
 
