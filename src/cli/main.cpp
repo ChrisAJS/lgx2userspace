@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <csignal>
 #include <liblgx.h>
@@ -7,7 +8,7 @@
 bool do_exit = false;
 
 int main(int argc, char **argv) {
-    std::cout << "lgx2userspace v0.1.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
+    std::cout << "lgx2userspace v0.2.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
 
     app::OptionParser optionParser{};
 
@@ -54,10 +55,6 @@ int main(int argc, char **argv) {
     device.initialise(targetDevice);
 
     SDL_Event event;
-
-    signal(SIGKILL, [](int) {
-        do_exit = true;
-    });
 
     signal(SIGTERM, [](int) {
         do_exit = true;

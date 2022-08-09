@@ -7,6 +7,8 @@ This project contains a userspace driver for the [AverMedia LGX2 (GC551)](https:
 It can be used to display the captured video and audio in a standalone window or
 to forward the captured video and audio to a virtual video capture device.
 
+There is even an incredibly unnecessary Windows build. Instructions on how to use this can be found in [WINDOWS.md](WINDOWS.md). Spoiler, it's not recommended. 
+
 ## Building
 To build the project, you will need:
 * CMake

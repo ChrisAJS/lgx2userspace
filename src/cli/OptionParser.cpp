@@ -20,10 +20,16 @@ bool app::OptionParser::process(int argc, char **argv) {
     {
         switch(getopt(argc, argv, "vVa:d:hxsg"))
         {
+#ifndef __MINGW32__
             case 'a':
                 std::cout << "Attempting to output to Pulseaudio sink: " << optarg << std::endl;
                 _audioOutput = new pulse::PulseAudioOutput(optarg);
                 continue;
+            case 'd':
+                std::cout << "Attempting to output to V4L2Loopback device: " << optarg << std::endl;
+                _videoOutput = new v4l::V4LFrameOutput(optarg);
+                continue;
+#endif
             case 'v':
                 std::cout <<"Logging diagnostics information at end of execution" << std::endl;
                 _logger = new ChronoLogger(true);
@@ -31,10 +37,6 @@ bool app::OptionParser::process(int argc, char **argv) {
             case 'V':
                 std::cout <<"Logging diagnostics information - with output during execution " << std::endl;
                 _logger = new ChronoLogger(false);
-                continue;
-            case 'd':
-                std::cout << "Attempting to output to V4L2Loopback device: " << optarg << std::endl;
-                _videoOutput = new v4l::V4LFrameOutput(optarg);
                 continue;
             case 'x':
                 std::cout << "Using the LGX GC550 support" << std::endl;
