@@ -1,6 +1,7 @@
 #ifndef LGX2USERSPACE_PULSEAUDIOOUTPUT_H
 #define LGX2USERSPACE_PULSEAUDIOOUTPUT_H
 
+#ifndef __APPLE__
 #ifndef __MINGW32__
 
 #include "lgxdevice.h"
@@ -28,6 +29,7 @@ private:
 
 }
 
+#endif
 #endif
 
 #endif //LGX2USERSPACE_PULSEAUDIOOUTPUT_H

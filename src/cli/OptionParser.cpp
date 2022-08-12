@@ -20,6 +20,7 @@ bool app::OptionParser::process(int argc, char **argv) {
     {
         switch(getopt(argc, argv, "vVa:d:hxsg"))
         {
+#ifndef __APPLE__
 #ifndef __MINGW32__
             case 'a':
                 std::cout << "Attempting to output to Pulseaudio sink: " << optarg << std::endl;
@@ -29,6 +30,7 @@ bool app::OptionParser::process(int argc, char **argv) {
                 std::cout << "Attempting to output to V4L2Loopback device: " << optarg << std::endl;
                 _videoOutput = new v4l::V4LFrameOutput(optarg);
                 continue;
+#endif
 #endif
             case 'v':
                 std::cout <<"Logging diagnostics information at end of execution" << std::endl;

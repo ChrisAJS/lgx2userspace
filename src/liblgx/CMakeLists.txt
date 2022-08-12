@@ -33,7 +33,7 @@ set(SDLOUTPUT_SOURCES
         src/sdl/SdlFrameOutput.cpp
         src/sdl/SdlFrameOutput.h)
 
-if (UNIX)
+if (CMAKE_SYSTEM MATCHES Linux)
     message("Detected Linux system")
     set(V4LOUTPUT_SOURCES src/v4l/V4LFrameOutput.cpp src/v4l/V4LFrameOutput.h)
     set(PULSE_SOURCES src/pulseaudio/PulseAudioOutput.cpp src/pulseaudio/PulseAudioOutput.h)
@@ -42,16 +42,28 @@ if (UNIX)
     set(PLATFORM_LIBS usb-1.0 pthread SDL2 pthread pulse-simple)
     set(PLATFORM_INCLUDES /usr/include)
 else()
-    message("Detected non-linux system")
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
+
     IF (CMAKE_SYSTEM MATCHES Windows)
         message("Building liblgx for Windows")
-        list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-        list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
         find_package(libusb)
         find_package(SDL2)
 
         set(LIBLGX_SOURCES ${LIBLGX_BASE_SOURCES} ${SDLOUTPUT_SOURCES} ${LOGGER_SOURCES})
         set(PLATFORM_LIBS mingw32 SDL2::SDL2main SDL2::SDL2 libusb::libusb -static-libgcc -mwindows)
+        set(PLATFORM_INCLUDES ${SDL2_INCLUDE_DIRS} ${libusb_INCLUDE_DIRS})
+
+        message("PLATFORM LIBS ${PLATFORM_LIBS}")
+    endif()
+
+    IF (CMAKE_SYSTEM MATCHES Darwin)
+        message("Building liblgx for MacOSX")
+        find_package(libusb)
+        find_package(SDL2)
+
+        set(LIBLGX_SOURCES ${LIBLGX_BASE_SOURCES} ${SDLOUTPUT_SOURCES} ${LOGGER_SOURCES})
+        set(PLATFORM_LIBS SDL2::SDL2main SDL2::SDL2 libusb::libusb)
         set(PLATFORM_INCLUDES ${SDL2_INCLUDE_DIRS} ${libusb_INCLUDE_DIRS})
 
         message("PLATFORM LIBS ${PLATFORM_LIBS}")

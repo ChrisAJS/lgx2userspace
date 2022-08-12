@@ -10,9 +10,11 @@
 #include "logging/ChronoLogger.h"
 #include "logging/NOOPLogger.h"
 
+#ifndef __APPLE__
 #ifndef __MINGW32__
 #  include "pulseaudio/PulseAudioOutput.h"
 #  include "v4l/V4LFrameOutput.h"
+#endif
 #endif
 
 #endif //LGX2USERSPACE_LIBLGX_H

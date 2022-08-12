@@ -7,19 +7,45 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 add_subdirectory(src/liblgx)
 add_subdirectory(src/cli)
 
-IF (NOT CMAKE_SYSTEM MATCHES Windows)
+IF (CMAKE_SYSTEM MATCHES Darwin)
+    message("Configuring for OSX")
+
+    message("GTK+ frontend only supported on Linux")
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
+
+    IF (NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+        message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+        file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake" "${CMAKE_BINARY_DIR}/conan.cmake" TLS_VERIFY ON)
+    ENDIF()
+
+    include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+    conan_cmake_configure(REQUIRES libusb/1.0.26 sdl/2.0.20 GENERATORS cmake_find_package)
+
+    conan_cmake_autodetect(settings)
+
+    conan_cmake_install(PATH_OR_REFERENCE . BUILD missing REMOTE conancenter SETTINGS ${settings} os=Macos)
+ENDIF()
+
+IF (CMAKE_SYSTEM MATCHES Linux)
+    message("Configuring for Linux")
     add_subdirectory(src/gtk)
     add_executable(usbsneef utils/usbsneef.c)
 
     target_link_libraries(usbsneef PRIVATE pcap)
-else(NOT CMAKE_SYSTEM MATCHES Windows)
+ENDIF()
+
+IF (CMAKE_SYSTEM MATCHES Windows)
+    message("Configuring for Windows")
     message("GTK+ frontend only supported on Linux")
     list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
     list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
-    if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+
+    IF (NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
         message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
         file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake" "${CMAKE_BINARY_DIR}/conan.cmake" TLS_VERIFY ON)
-    endif()
+    ENDIF()
 
     include(${CMAKE_BINARY_DIR}/conan.cmake)
 
@@ -29,6 +55,6 @@ else(NOT CMAKE_SYSTEM MATCHES Windows)
 
     conan_cmake_install(PATH_OR_REFERENCE . BUILD missing REMOTE conancenter SETTINGS ${settings} os=Windows)
 
-endif(NOT CMAKE_SYSTEM MATCHES Windows)
+ENDIF()
 
 include(version.cmake)
