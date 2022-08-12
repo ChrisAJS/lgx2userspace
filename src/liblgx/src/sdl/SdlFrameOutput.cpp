@@ -1,11 +1,14 @@
 #include "SdlFrameOutput.h"
 
 #include <SDL2/SDL.h>
+#include <stdexcept>
 
 namespace sdl {
 
     SdlFrameOutput::SdlFrameOutput() {
-        SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
+            throw std::runtime_error(SDL_GetError());
+        }
     }
 
     void SdlFrameOutput::initialiseVideo() {
