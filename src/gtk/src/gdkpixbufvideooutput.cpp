@@ -13,7 +13,6 @@ void GdkPixbufVideoOutput::initialiseVideo() {
 
 void GdkPixbufVideoOutput::videoFrameAvailable(__uint32_t *image) {
     convert_yuv_to_rgb_buffer(reinterpret_cast<unsigned char *>(image), gdk_pixbuf_get_pixels(pixbuf));
-
 }
 
 void GdkPixbufVideoOutput::display() {

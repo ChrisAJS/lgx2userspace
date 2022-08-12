@@ -33,12 +33,29 @@ set(SDLOUTPUT_SOURCES
         src/sdl/SdlFrameOutput.cpp
         src/sdl/SdlFrameOutput.h)
 
+set(SFMLOUTPUT_SOURCES
+        src/sfml/SFMLFrameOutput.cpp
+        src/sfml/SFMLFrameOutput.h)
+
+if (USE_SFML MATCHES ON)
+    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h "#define USE_SFML 1")
+else()
+    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h "#define USE_SDL 1")
+endif()
+
 if (CMAKE_SYSTEM MATCHES Linux)
     message("Detected Linux system")
     set(V4LOUTPUT_SOURCES src/v4l/V4LFrameOutput.cpp src/v4l/V4LFrameOutput.h)
     set(PULSE_SOURCES src/pulseaudio/PulseAudioOutput.cpp src/pulseaudio/PulseAudioOutput.h)
 
-    set(LIBLGX_SOURCES ${LIBLGX_BASE_SOURCES} ${V4LOUTPUT_SOURCES} ${PULSE_SOURCES} ${SDLOUTPUT_SOURCES} ${LOGGER_SOURCES})
+    set(LIBLGX_SOURCES ${LIBLGX_BASE_SOURCES} ${V4LOUTPUT_SOURCES} ${PULSE_SOURCES} ${LOGGER_SOURCES})
+    if (${USE_SFML} MATCHES True)
+        message("Using SFML Output")
+        set(LIBLGX_SOURCES ${LIBLGX_SOURCES} ${SFMLOUTPUT_SOURCES})
+    else()
+        message("Using SDL Output")
+        set(LIBLGX_SOURCES ${LIBLGX_SOURCES} ${SDLOUTPUT_SOURCES})
+    endif()
     set(PLATFORM_LIBS usb-1.0 pthread SDL2 pthread pulse-simple)
     set(PLATFORM_INCLUDES /usr/include)
 else()
@@ -60,15 +77,25 @@ else()
     IF (CMAKE_SYSTEM MATCHES Darwin)
         message("Building liblgx for MacOSX")
         find_package(libusb)
-        find_package(SDL2)
+        if (${USE_SFML} MATCHES ON)
+            message("Using SFML Output")
+            set(LIBLGX_SOURCES ${LIBLGX_SOURCES} ${SFMLOUTPUT_SOURCES})
+            find_package(SFML)
+            set(PLATFORM_LIBS SFML::graphics SFML::window SFML::audio SFML::system libusb::libusb)
+        else()
+            message("Using SDL Output")
+            set(LIBLGX_SOURCES ${LIBLGX_SOURCES} ${SDLOUTPUT_SOURCES})
+            find_package(SDL2)
+            set(PLATFORM_LIBS SDL2::SDL2main SDL2::SDL2 libusb::libusb)
+        endif()
 
-        set(LIBLGX_SOURCES ${LIBLGX_BASE_SOURCES} ${SDLOUTPUT_SOURCES} ${LOGGER_SOURCES})
-        set(PLATFORM_LIBS SDL2::SDL2main SDL2::SDL2 libusb::libusb)
+        set(LIBLGX_SOURCES ${LIBLGX_SOURCES} ${LIBLGX_BASE_SOURCES} ${LOGGER_SOURCES})
+
         set(PLATFORM_INCLUDES ${SDL2_INCLUDE_DIRS} ${libusb_INCLUDE_DIRS})
 
         message("PLATFORM LIBS ${PLATFORM_LIBS}")
     endif()
-endif (UNIX)
+endif (CMAKE_SYSTEM MATCHES Linux)
 
 add_library(liblgx STATIC ${LIBLGX_SOURCES})
 

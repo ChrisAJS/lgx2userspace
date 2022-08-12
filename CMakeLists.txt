@@ -4,6 +4,8 @@ project(lgx2userspace)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 
+option(USE_SFML "Use SFML over SDL" ON)
+
 add_subdirectory(src/liblgx)
 add_subdirectory(src/cli)
 
@@ -21,7 +23,7 @@ IF (CMAKE_SYSTEM MATCHES Darwin)
 
     include(${CMAKE_BINARY_DIR}/conan.cmake)
 
-    conan_cmake_configure(REQUIRES libusb/1.0.26 sdl/2.0.20 GENERATORS cmake_find_package)
+    conan_cmake_configure(REQUIRES libusb/1.0.26 sdl/2.0.20 sfml/2.5.1 GENERATORS cmake_find_package IMPORTS "bin, *.dll -> ./bin" IMPORTS "lib, *.dylib* -> ./bin")
 
     conan_cmake_autodetect(settings)
 
@@ -38,6 +40,7 @@ ENDIF()
 
 IF (CMAKE_SYSTEM MATCHES Windows)
     message("Configuring for Windows")
+
     message("GTK+ frontend only supported on Linux")
     list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
     list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
@@ -49,7 +52,7 @@ IF (CMAKE_SYSTEM MATCHES Windows)
 
     include(${CMAKE_BINARY_DIR}/conan.cmake)
 
-    conan_cmake_configure(REQUIRES libusb/1.0.26 sdl/2.0.20 GENERATORS cmake_find_package)
+    conan_cmake_configure(REQUIRES libusb/1.0.26 sdl/2.0.20 sfml/2.5.1 GENERATORS cmake_find_package)
 
     conan_cmake_autodetect(settings)
 
