@@ -1,4 +1,7 @@
 # LGX2 Userspace driver (with LGX support)
+**Before continuing! This project aims to provide support for the LGX and LGX2 USB capture cards. The software is not extensively tested and the effects it has on the capture cards is also not fully understood. If you use the LGX and LGX2 on Windows using the official driver, using this userspace driver may prevent such a set up to continue working.**
+**Please please please understand that you are risking your LGX or LGX2 by using this software.**
+
 This software is little more than a POC and no guarantees of functionality are given and it may even be dangerous to use this software. Please
 consider contacting AverMedia for a supported Linux driver.
 
