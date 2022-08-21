@@ -38,18 +38,10 @@ int main(int argc, char **argv) {
 
     lgx2::Device device{&stream, videoOutput, audioOutput, logger};
 
-    bool lgxAvailable = device.isDeviceAvailable(lgx2::DeviceType::LGX);
-    bool lgx2Available = device.isDeviceAvailable(lgx2::DeviceType::LGX2);
     lgx2::DeviceType targetDevice = optionParser.deviceType();
 
-    if (lgxAvailable && lgx2Available) {
-        printf("Unable to auto detect which device to use as both LGX and LGX2 available - will use as indicated by the -x argument.\n");
-    } else {
-        if (lgxAvailable) {
-            targetDevice = lgx2::DeviceType::LGX;
-        } else if (lgx2Available) {
-            targetDevice = lgx2::DeviceType::LGX2;
-        }
+    if (!device.isDeviceAvailable(targetDevice)) {
+        throw std::runtime_error("Target device is not available to use - is it plugged in?");
     }
 
     device.initialise(targetDevice);

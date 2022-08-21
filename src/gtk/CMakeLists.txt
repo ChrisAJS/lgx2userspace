@@ -10,7 +10,6 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -O3")
 add_executable(lgx2userspace-gtk src/main.cpp src/gdkpixbufvideooutput.cpp src/gdkpixbufvideooutput.h src/lgxsession.cpp src/lgxsession.h)
 
 target_include_directories(lgx2userspace-gtk PRIVATE ${GTK_INCLUDE_DIRS} liblgx)
-message("GTKMM INCLUDE DIR: ${GTK_LIBRARIES}")
 
 target_link_libraries(lgx2userspace-gtk PRIVATE ${GTK_LIBRARIES} liblgx)
 

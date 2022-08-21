@@ -38,10 +38,12 @@ bool app::OptionParser::process(int argc, char **argv) {
                 std::cout <<"Logging diagnostics information - with output during execution " << std::endl;
                 _logger = new ChronoLogger(false);
                 continue;
+#ifdef GC550_SUPPORT
             case 'x':
                 std::cout << "Using the LGX GC550 support" << std::endl;
                 _deviceType = lgx2::DeviceType::LGX;
                 continue;
+#endif
             case 's':
                 _videoOutput = new NullVideoOutput();
                 continue;
@@ -55,7 +57,9 @@ bool app::OptionParser::process(int argc, char **argv) {
                     "\t-v\tPrint diagnostics information summary at end of execution, useful when submitting bugs\n"
                     "\t-V\tPrint diagnostic information during execution\n"
                     "\t-d V4L2LoopbackDevice\tSpecify the V4L2Loopback device to output video to (e.g. /dev/video99)\n\n"
+#ifdef GC550_SUPPORT
                     "\t-x Use LGX (GC550) device specifically\n"
+#endif
                     "\t-a Pulseaudio sink\tOutput audio to a Pulseaudio sink (useful when outputting video to V4L2Loopback)\n"
                     "\t-s Output only sound\n"
                     "\t-g Output video only\n";

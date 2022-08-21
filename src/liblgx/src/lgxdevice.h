@@ -1,6 +1,7 @@
 #ifndef LGX2USERSPACE_LGXDEVICE_H
 #define LGX2USERSPACE_LGXDEVICE_H
 
+#include "config.h"
 #include <functional>
 #include <cstdint>
 #include <string>
@@ -9,7 +10,10 @@
 namespace lgx2 {
 
     enum class DeviceType {
+
+#ifdef GC550_SUPPORT
         LGX,
+#endif
         LGX2
     };
 

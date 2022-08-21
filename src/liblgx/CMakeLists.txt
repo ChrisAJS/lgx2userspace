@@ -6,6 +6,12 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 
+IF (ENABLE_LGX_GC550_SUPPORT)
+    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h "#define GC550_SUPPORT")
+ELSE()
+    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h "#define GC550_NOT_SUPPORTED")
+ENDIF()
+
 set(LIBLGX_BASE_SOURCES
         src/liblgx.h
         src/lgxdevice.cpp

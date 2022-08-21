@@ -40,10 +40,13 @@ namespace libusb {
                 if (desc.idProduct == 0x0551) {
                     printf("LGX2 (GC551) detected\n");
                     _availableDevices.push_back(lgx2::DeviceType::LGX2);
-                } else if (desc.idProduct == 0x4710){
+                }
+#ifdef GC550_SUPPORT
+                else if (desc.idProduct == 0x4710) {
                     printf("LGX (GC550) detected\n");
                     _availableDevices.push_back(lgx2::DeviceType::LGX);
                 }
+#endif
             }
         }
 
@@ -60,15 +63,22 @@ namespace libusb {
     }
 
     void UsbStream::streamSetupCommands(lgx2::DeviceType deviceType) {
+        std::string targetCommands;
         if (deviceType == lgx2::DeviceType::LGX2) {
             _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x0551);
+            targetCommands = lgx2_setup_commands;
         } else {
+#ifdef GC550_SUPPORT
             _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x4710);
+            targetCommands = lgx_setup_commands;
+#else
+            throw std::runtime_error("Dangerous LGX (GC550) support has not been compiled. Check the README.md");
+#endif
         }
 
         if (_dev == nullptr) {
             throw std::runtime_error(
-                    "Failed to open lgx/lgx2 - is it connected? Run lsusb to check and ensure you have installed the udev rules (and restarted udev if necessary!)");
+                    "Failed to open device - is it connected? Run lsusb to check and ensure you have installed the udev rules (and restarted udev if necessary!)");
         }
 
         if (libusb_set_configuration(_dev, 1) != LIBUSB_SUCCESS) {
@@ -76,7 +86,8 @@ namespace libusb {
         }
 
         if (libusb_claim_interface(_dev, 0) != LIBUSB_SUCCESS) {
-            throw std::runtime_error("Could not claim interface for lgx/lgx2 - is something else using the device?\n");
+            throw std::runtime_error(
+                    "Could not claim interface for the device - is something else using the device?\n");
         }
 
         int check = 0;
@@ -88,18 +99,13 @@ namespace libusb {
 
         int actualLength;
         uint8_t transferBuffer[512]{0};
-        std::string targetCommands;
-        if (deviceType == lgx2::DeviceType::LGX2) {
-            targetCommands = lgx2_setup_commands;
-        } else {
-            targetCommands = lgx_setup_commands;
-        }
+
 
         auto commands = std::istringstream{targetCommands};
         std::string command;
         while (commands >> command) {
             if (command[0] == '>') {
-                int commandLength = (int)(command.length() - 1) / 2;
+                int commandLength = (int) (command.length() - 1) / 2;
                 for (int i = 0; i < commandLength; i++) {
                     transferBuffer[i] = std::stoi(command.substr(1 + i * 2, 2), nullptr, 16);
                 }
