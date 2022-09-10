@@ -35,13 +35,13 @@ To build the project, you will need:
 The following packages need to be installed:
 
 ```bash
-sudo apt install cmake libusb-dev libsdl2-dev libsdl2-gfx-dev libpulse-dev v4l2loopback-dkms v4l2loopback-utils
+sudo apt install cmake libusb-dev libsdl2-dev libsdl2-gfx-dev libpulse-dev v4l2loopback-dkms v4l2loopback-utils libgtk4-dev
 ```
 ### Arch Linux (Unconfirmed)
 The following packages need to be installed:
 
 ```bash
-sudo pacman -S cmake libusb sdl2 sdl2_gfx libpulse v4l2loopback-dkms v4l2loopback-utils
+sudo pacman -S cmake libusb sdl2 sdl2_gfx libpulse v4l2loopback-dkms v4l2loopback-utils gtk4
 ```
 
 ### Build Command
