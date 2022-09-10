@@ -31,15 +31,8 @@ LGXSession::LGXSession(GtkWidget *drawingArea) : drawingArea{drawingArea} {
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawingArea), onDrawingAreaDrawPlaceholder, this, nullptr);
 }
 
-bool LGXSession::hasAnyDevices() {
-    return device->isDeviceAvailable(lgx2::DeviceType::LGX) || device->isDeviceAvailable(lgx2::DeviceType::LGX2);
-}
-
-bool LGXSession::hasMultipleDevices() {
-    return device->isDeviceAvailable(lgx2::DeviceType::LGX) && device->isDeviceAvailable(lgx2::DeviceType::LGX2);
-}
-
 void LGXSession::startCapture() {
+#ifdef GC550_SUPPORT
     bool lgxAvailable = device->isDeviceAvailable(lgx2::DeviceType::LGX);
     bool lgx2Available = device->isDeviceAvailable(lgx2::DeviceType::LGX2);
 
@@ -47,8 +40,17 @@ void LGXSession::startCapture() {
         device->initialise(lgx2::DeviceType::LGX);
     } else if (lgx2Available) {
         device->initialise(lgx2::DeviceType::LGX2);
+    } else {
+        g_print("Attempted to start capture, but no LGX or LGX2 were detected\n");
+    }
+#else
+    if (device->isDeviceAvailable(lgx2::DeviceType::LGX2)) {
+        device->initialise(lgx2::DeviceType::LGX2);
+    } else {
+        g_print("Attempted to start capture, but LGX2 was not detected\n");
     }
 
+#endif
     g_object_ref(drawingArea);
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawingArea), onDrawingAreaDraw, this, nullptr);
 }

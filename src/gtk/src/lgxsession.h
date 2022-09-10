@@ -9,10 +9,6 @@ class LGXSession {
 public:
     LGXSession(struct _GtkWidget *drawingArea);
 
-    bool hasAnyDevices();
-
-    bool hasMultipleDevices();
-
     void startCapture();
 
     void run();
