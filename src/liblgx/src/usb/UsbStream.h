@@ -10,7 +10,7 @@ namespace libusb {
     class UsbStream : public lgx2::Stream {
     public:
         explicit UsbStream();
-        ~UsbStream();
+        ~UsbStream() override;
 
         bool deviceAvailable(lgx2::DeviceType deviceType) override;
         void streamSetupCommands(lgx2::DeviceType deviceType) override;

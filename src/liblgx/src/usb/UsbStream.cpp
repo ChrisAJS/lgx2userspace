@@ -93,7 +93,7 @@ namespace libusb {
         int check = 0;
         int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x03, _frameBuffer, LGX_DATA_FRAME_LEN, &check, 100);
         if (res != LIBUSB_ERROR_TIMEOUT) {
-            printf("Skipping bootsrap - device is already producing framedata\n");
+            printf("Skipping bootstrap - device is already producing frame data\n");
             return;
         }
 
@@ -112,13 +112,13 @@ namespace libusb {
                 libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, transferBuffer, static_cast<int>(commandLength),
                                      &actualLength, 0);
                 if (actualLength != commandLength) {
-                    throw std::runtime_error("Underrun when attempting to write command data for setup");
+                    throw std::runtime_error("Under-run when attempting to write command data for setup");
                 }
             } else {
                 int bytesToRead = std::stoi(command.substr(1));
                 libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x01, transferBuffer, bytesToRead, &actualLength, 0);
                 if (actualLength != bytesToRead) {
-                    throw std::runtime_error("Underrun when attempting to read data during setup");
+                    throw std::runtime_error("Under-run when attempting to read data during setup");
                 }
             }
         }
