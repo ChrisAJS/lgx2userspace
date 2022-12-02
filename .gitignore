@@ -1,5 +1,5 @@
 .idea
-cmake-build-debug
+cmake-build-debug*
 build/
 src/version.h
 /src/liblgx/src/config.h

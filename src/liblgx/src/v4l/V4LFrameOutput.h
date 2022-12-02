@@ -7,7 +7,7 @@
 namespace v4l {
     class V4LFrameOutput : public lgx2::VideoOutput {
     public:
-        V4LFrameOutput(const std::string &deviceName);
+        explicit V4LFrameOutput(const std::string &deviceName);
 
         void initialiseVideo() override;
 
