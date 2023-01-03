@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
     lgx2::VideoOutput *videoOutput{optionParser.videoOutput()};
     lgx2::AudioOutput *audioOutput{optionParser.audioOutput()};
 
-    libusb::UsbStream stream{};
-    sdl::SdlFrameOutput sdlOutput = sdl::SdlFrameOutput();
+    lgx2::Stream *stream{optionParser.stream()};
+    sdl::SdlFrameOutput sdlOutput{};
     NOOPLogger noopLogger{};
 
     if (videoOutput == nullptr) {
@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
         logger = &noopLogger;
     }
 
-    lgx2::Device device{&stream, videoOutput, audioOutput, logger};
+    lgx2::Device device{stream, videoOutput, audioOutput, logger};
 
     lgx2::DeviceType targetDevice = optionParser.deviceType();
 

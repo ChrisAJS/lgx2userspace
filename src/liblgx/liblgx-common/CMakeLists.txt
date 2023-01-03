@@ -22,6 +22,10 @@ set(NULL_SOURCES
         src/NullAudioOutput.cpp
         src/NullAudioOutput.h)
 
+set(FAKE_USB_SOURCES
+        src/FakeUsbStream.cpp
+        src/FakeUsbStream.h)
+
 set(USB_SOURCES
         src/usb/UsbStream.cpp
         src/usb/UsbStream.h)
@@ -31,6 +35,7 @@ add_library(liblgx-common STATIC
         ${NULL_SOURCES}
         ${USB_SOURCES}
         ${BOOTSTRAP_SOURCES}
+        ${FAKE_USB_SOURCES}
         src/lgxcommon.h)
 
 target_include_directories(liblgx-common PUBLIC src)

@@ -12,8 +12,12 @@ namespace sdl {
     }
 
     void SdlFrameOutput::initialiseVideo() {
-        _window = SDL_CreateWindow("lgx2userspace", 1920, 100, 1920, 1080, SDL_WINDOW_RESIZABLE);
-        _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
+        _window = SDL_CreateWindow("lgx2userspace",
+                                   SDL_WINDOWPOS_UNDEFINED,
+                                   SDL_WINDOWPOS_UNDEFINED,
+                                   1920, 1080,
+                                   SDL_WINDOW_RESIZABLE);
+        _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
         SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
         SDL_RenderClear(_renderer);
@@ -41,7 +45,7 @@ namespace sdl {
     }
 
     void SdlFrameOutput::videoFrameAvailable(uint32_t *image) {
-        uint16_t *pixels{nullptr};
+        uint8_t *pixels{nullptr};
         int32_t pitch;
         int result = SDL_LockTexture(_texture, nullptr, (void **) &pixels, &pitch);
         if (pixels != nullptr && result == 0) {
@@ -55,7 +59,6 @@ namespace sdl {
     }
 
     void SdlFrameOutput::display() {
-
         const Uint8 *keyboardState = SDL_GetKeyboardState(nullptr);
 
         if (keyboardState[SDL_SCANCODE_F]) {
@@ -82,5 +85,4 @@ namespace sdl {
         SDL_PauseAudioDevice(_audio, 1);
         SDL_CloseAudioDevice(_audio);
     }
-
 }

@@ -15,10 +15,18 @@ lgx2::Logger *app::OptionParser::logger() {
     return _logger;
 }
 
+lgx2::Stream *app::OptionParser::stream() {
+    return _stream;
+}
+
+lgx2::DeviceType app::OptionParser::deviceType() {
+    return _deviceType;
+}
+
 bool app::OptionParser::process(int argc, char **argv) {
     for(;;)
     {
-        switch(getopt(argc, argv, "vVa:d:hxsg"))
+        switch(getopt(argc, argv, "vVa:d:hxsgf"))
         {
 #ifndef __MINGW32__
             case 'a':
@@ -30,6 +38,10 @@ bool app::OptionParser::process(int argc, char **argv) {
                 _videoOutput = new v4l::V4LFrameOutput(optarg);
                 continue;
 #endif
+            case 'f':
+                std::cout << "Using fake USB stream - reading data from 'dump.bin'" << std::endl;
+                _stream = new FakeUsbStream();
+                continue;
             case 'v':
                 std::cout <<"Logging diagnostics information at end of execution" << std::endl;
                 _logger = new ChronoLogger(true);
@@ -62,7 +74,8 @@ bool app::OptionParser::process(int argc, char **argv) {
 #endif
                     "\t-a Pulseaudio sink\tOutput audio to a Pulseaudio sink (useful when outputting video to V4L2Loopback)\n"
                     "\t-s Output only sound\n"
-                    "\t-g Output video only\n";
+                    "\t-g Output video only\n"
+                    "\t-f Use a fake USB stream containing unprocessed frames from a dump.bin file\n";
                 return false;
             case -1:
                 break;
@@ -71,9 +84,9 @@ bool app::OptionParser::process(int argc, char **argv) {
         break;
     }
 
-    return true;
-}
+    if (_stream == nullptr) {
+        _stream = new libusb::UsbStream();
+    }
 
-lgx2::DeviceType app::OptionParser::deviceType() {
-    return _deviceType;
+    return true;
 }

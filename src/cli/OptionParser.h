@@ -12,12 +12,14 @@ namespace app {
         lgx2::AudioOutput *audioOutput();
         lgx2::Logger *logger();
         lgx2::DeviceType deviceType();
+        lgx2::Stream *stream();
 
     private:
         lgx2::VideoOutput *_videoOutput;
         lgx2::AudioOutput *_audioOutput;
         lgx2::Logger *_logger;
         lgx2::DeviceType _deviceType{lgx2::DeviceType::LGX2};
+        lgx2::Stream *_stream{nullptr};
     };
 }
 
