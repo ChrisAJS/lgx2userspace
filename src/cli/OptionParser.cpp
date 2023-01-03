@@ -84,9 +84,5 @@ bool app::OptionParser::process(int argc, char **argv) {
         break;
     }
 
-    if (_stream == nullptr) {
-        _stream = new libusb::UsbStream();
-    }
-
     return true;
 }

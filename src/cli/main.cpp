@@ -24,6 +24,10 @@ int main(int argc, char **argv) {
     sdl::SdlFrameOutput sdlOutput{};
     NOOPLogger noopLogger{};
 
+    if (stream == nullptr) {
+        stream = new libusb::UsbStream();
+    }
+
     if (videoOutput == nullptr) {
         videoOutput = &sdlOutput;
     }

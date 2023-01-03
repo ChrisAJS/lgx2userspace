@@ -23,6 +23,7 @@ add_subdirectory(src/cli)
 
 IF (NOT CMAKE_SYSTEM MATCHES Windows)
     add_subdirectory(src/gtk)
+    add_subdirectory(src/qt)
     add_executable(usbsneef utils/usbsneef.c)
 
     target_link_libraries(usbsneef PRIVATE pcap)
