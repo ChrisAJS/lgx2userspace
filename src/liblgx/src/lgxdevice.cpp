@@ -1,7 +1,6 @@
 #include "lgxdevice.h"
 
 #include <chrono>
-#include <unistd.h>
 
 namespace lgx2 {
 
@@ -25,19 +24,17 @@ namespace lgx2 {
     }
 
     void Device::run() {
-        ensureMinimumDuration([&]() {
-            _logger->logTimeStart("streamUpdate");
-            _stream->update();
-            _logger->logTimeEnd("streamUpdate", "Stream update");
+        _logger->logTimeStart("streamUpdate");
+        _stream->update();
+        _logger->logTimeEnd("streamUpdate", "Stream update");
 
-            _logger->logTimeStart("videoDisplay");
-            _videoOutput->display();
-            _logger->logTimeEnd("videoDisplay", "Video display update");
+        _logger->logTimeStart("videoDisplay");
+        _videoOutput->display();
+        _logger->logTimeEnd("videoDisplay", "Video display update");
 
-            _logger->logTimeStart("audioOutput");
-            _audioOutput->render();
-            _logger->logTimeEnd("audioOutput", "Audio output render");
-        });
+        _logger->logTimeStart("audioOutput");
+        _audioOutput->render();
+        _logger->logTimeEnd("audioOutput", "Audio output render");
     }
 
     void Device::onFrameData(uint8_t *data) {
@@ -88,15 +85,5 @@ namespace lgx2 {
         _videoOutput->shutdownVideo();
         _audioOutput->shutdownAudio();
         _stream->shutdownStream();
-    }
-
-    void Device::ensureMinimumDuration(const std::function<void()> &action) {
-        auto start = std::chrono::steady_clock::now();
-        action();
-        auto end = std::chrono::steady_clock::now();
-        long timeTaken = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-        if (timeTaken < 8333) {
-            usleep(8333 - timeTaken);
-        }
     }
 }

@@ -93,8 +93,6 @@ namespace lgx2 {
         void produceVideoData(uint8_t *data);
 
         void produceAudioData(uint8_t *data);
-
-        static void ensureMinimumDuration(const std::function<void()> &action);
     };
 
 }

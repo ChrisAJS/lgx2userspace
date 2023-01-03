@@ -16,6 +16,9 @@ static void usbTransferComplete(struct libusb_transfer *transfer) {
 
     if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
         stream->onFrameData(transfer);
+    } else {
+        printf("USB read error: %d\n", transfer->status);
+        exit(-1);
     }
 
     stream->submitTransfer(transfer);
@@ -95,6 +98,8 @@ namespace libusb {
         if (res != LIBUSB_ERROR_TIMEOUT) {
             printf("Skipping bootstrap - device is already producing frame data\n");
             return;
+        } else {
+            printf("Did not receive a response from the device, assuming not bootstrapped\n");
         }
 
         int actualLength;

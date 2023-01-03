@@ -1,6 +1,6 @@
 
 if (UNIX)
-    set(PLATFORM_LIBS pthread SDL2)
+    set(PLATFORM_LIBS pthread SDL2 usb-1.0)
     set(PLATFORM_INCLUDES)
 endif ()
 
