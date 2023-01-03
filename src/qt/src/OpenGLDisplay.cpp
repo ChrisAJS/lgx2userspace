@@ -67,22 +67,6 @@ void OpenGLDisplay::initializeGL() {
     impl->textureUniformU = impl->mShaderProgram->uniformLocation("tex_u");
     impl->textureUniformV = impl->mShaderProgram->uniformLocation("tex_v");
 
-    //Vertex matrix
-    static const GLfloat vertexVertices[] = {
-            -1.0f, -1.0f,
-            1.0f, -1.0f,
-            -1.0f, 1.0f,
-            1.0f, 1.0f,
-    };
-
-    //Texture matrix
-    static const GLfloat textureVertices[] = {
-            0.0f, 1.0f,
-            1.0f, 1.0f,
-            0.0f, 0.0f,
-            1.0f, 0.0f,
-    };
-
     // Set the value of the vertex matrix of the attribute ATTRIB_VERTEX and format
     glVertexAttribPointer(ATTRIB_VERTEX, 2, GL_FLOAT, 0, 0, vertexVertices);
     // Set the texture matrix value and format of the attribute ATTRIB_TEXTURE
@@ -141,11 +125,6 @@ void OpenGLDisplay::compileFragmentShader() {
             "    rgb.b = clamp(y + (1.732446 * (u - 0.5)), 0, 1);"
             "    gl_FragColor = vec4(rgb, 1);"
             "}"
-
-
-    //pixel[0] = clamp(y + (1.370705 * (v - 128)));
-    //pixel[1] = clamp(y - (0.698001 * (v - 128)) - (0.337633 * (u - 128)));
-    //pixel[2] = clamp(y + (1.732446 * (u - 128)));
     );
 
     if (!bCompile) {

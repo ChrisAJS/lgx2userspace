@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 
 enable_testing()
 
-include(../dependencies.cmake)
+include(../../../dependencies.cmake)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -15,6 +15,10 @@ set(BOOTSTRAP_SOURCES
 set(SDLOUTPUT_SOURCES
         src/sdl/SdlFrameOutput.cpp
         src/sdl/SdlFrameOutput.h)
+
+set(GLFWOUTPUT_SOURCES
+        src/glfw/GlfwFrameOutput.cpp
+        src/glfw/GlfwFrameOutput.h)
 
 set(NULL_SOURCES
         src/NullVideoOutput.cpp
@@ -32,6 +36,7 @@ set(USB_SOURCES
 
 add_library(liblgx-common STATIC
         ${SDLOUTPUT_SOURCES}
+        ${GLFWOUTPUT_SOURCES}
         ${NULL_SOURCES}
         ${USB_SOURCES}
         ${BOOTSTRAP_SOURCES}

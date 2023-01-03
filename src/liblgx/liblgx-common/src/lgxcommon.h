@@ -1,4 +1,5 @@
 #include "sdl/SdlFrameOutput.h"
+#include "glfw/GlfwFrameOutput.h"
 #include "usb/UsbStream.h"
 #include "NullAudioOutput.h"
 #include "NullVideoOutput.h"

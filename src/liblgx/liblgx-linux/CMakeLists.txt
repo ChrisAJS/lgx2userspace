@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.18)
 
 enable_testing()
 
-set(CMAKE_CXX_STANDARD 14)
-
 set(V4LOUTPUT_SOURCES
         src/v4l/V4LFrameOutput.cpp
         src/v4l/V4LFrameOutput.h)

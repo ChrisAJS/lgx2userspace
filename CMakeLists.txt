@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.18)
 project(lgx2userspace)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+
 OPTION(ENABLE_LGX_GC550_SUPPORT "Enables LGX (GC550) support which will prevent further use of the LGX with the official Windows driver" OFF)
 
 if (ENABLE_LGX_GC550_SUPPORT)
@@ -15,20 +18,7 @@ else()
     message("Dangerous LGX (GC550) support will not be compiled into the lgx2userspace executable.")
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-
 add_subdirectory(src/liblgx)
 add_subdirectory(src/cli)
-
-IF (NOT CMAKE_SYSTEM MATCHES Windows)
-    add_subdirectory(src/gtk)
-    add_subdirectory(src/qt)
-    add_executable(usbsneef utils/usbsneef.c)
-
-    target_link_libraries(usbsneef PRIVATE pcap)
-else(NOT CMAKE_SYSTEM MATCHES Windows)
-    message("GTK+ frontend only supported on Linux")
-endif(NOT CMAKE_SYSTEM MATCHES Windows)
 
 include(version.cmake)
