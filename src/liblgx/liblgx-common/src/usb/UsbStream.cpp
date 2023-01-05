@@ -41,13 +41,22 @@ namespace libusb {
             libusb_get_device_descriptor(device, &desc);
             if (desc.idVendor == 0x07ca) {
                 if (desc.idProduct == 0x0551) {
-                    printf("LGX2 (GC551) detected\n");
-                    _availableDevices.push_back(lgx2::DeviceType::LGX2);
+                    if (desc.bcdUSB >= 0x300) {
+                        printf("LGX2 (GC551) detected\n");
+                        _availableDevices.push_back(lgx2::DeviceType::LGX2);
+                    } else {
+                        fprintf(stderr, "LGX2 (GC551) detected, but the device is not using USB3. Ensure you are using a USB3 port (often denoted with a specific colour on systems with both USB2 and 3) and that you are using a cable that is capable of USB3 speeds.\n");
+                    }
                 }
+
 #ifdef GC550_SUPPORT
                 else if (desc.idProduct == 0x4710) {
-                    printf("LGX (GC550) detected\n");
-                    _availableDevices.push_back(lgx2::DeviceType::LGX);
+                    if (desc.bcdUSB >= 0x300) {
+                        printf("LGX (GC550) detected\n");
+                        _availableDevices.push_back(lgx2::DeviceType::LGX);
+                    } else {
+                        fprintf(stderr, "LGX (GC550) detected, but the device is not using USB3. Ensure you are using a USB3 port (often denoted with a specific colour on systems with both USB2 and 3) and that you are using a cable that is capable of USB3 speeds.\n");
+                    }
                 }
 #endif
             }
