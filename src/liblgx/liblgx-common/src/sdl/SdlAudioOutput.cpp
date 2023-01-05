@@ -4,8 +4,7 @@
 namespace sdl {
 
     SdlAudioOutput::SdlAudioOutput() {
-
-        if (SDL_AudioInit(nullptr) != 0) {
+        if (SDL_Init(SDL_INIT_AUDIO) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
     }
