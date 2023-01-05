@@ -4,12 +4,11 @@
 #include <liblgx.h>
 #include "OptionParser.h"
 #include "../version.h"
-#include <GLFW/glfw3.h>
 
 bool do_exit = false;
 
 int main(int argc, char **argv) {
-    std::cout << "lgx2userspace v0.2.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
+    std::cout << "lgx2userspace-glfw " << APP_VERSION << " ("<< GIT_BRANCH << "-" << GIT_REV << " - " << GIT_TAG << ")" << std::endl;
 
     app::OptionParser optionParser{};
 
@@ -20,25 +19,22 @@ int main(int argc, char **argv) {
     lgx2::Logger *logger{optionParser.logger()};
     lgx2::VideoOutput *videoOutput{optionParser.videoOutput()};
     lgx2::AudioOutput *audioOutput{optionParser.audioOutput()};
-
     lgx2::Stream *stream{optionParser.stream()};
-    glfw::GlfwFrameOutput frameOutput{};
-    NOOPLogger noopLogger{};
 
     if (stream == nullptr) {
         stream = new libusb::UsbStream();
     }
 
     if (videoOutput == nullptr) {
-        videoOutput = &frameOutput;
+        videoOutput = new glfw::GlfwVideoOutput{};
     }
 
     if (audioOutput == nullptr) {
-        audioOutput = &frameOutput;
+        audioOutput = new sdl::SdlAudioOutput{};
     }
 
     if (logger == nullptr) {
-        logger = &noopLogger;
+        logger = new NOOPLogger{};
     }
 
     lgx2::Device device{stream, videoOutput, audioOutput, logger};

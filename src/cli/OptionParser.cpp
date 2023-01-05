@@ -1,7 +1,6 @@
 #include <getopt.h>
 #include <iostream>
 #include "OptionParser.h"
-#include <liblgx.h>
 
 lgx2::VideoOutput *app::OptionParser::videoOutput() {
     return _videoOutput;
@@ -68,11 +67,13 @@ bool app::OptionParser::process(int argc, char **argv) {
                     " usage:\n"
                     "\t-v\tPrint diagnostics information summary at end of execution, useful when submitting bugs\n"
                     "\t-V\tPrint diagnostic information during execution\n"
+#ifndef __MINGW32__
                     "\t-d V4L2LoopbackDevice\tSpecify the V4L2Loopback device to output video to (e.g. /dev/video99)\n\n"
+                    "\t-a Pulseaudio sink\tOutput audio to a Pulseaudio sink (useful when outputting video to V4L2Loopback)\n"
+#endif
 #ifdef GC550_SUPPORT
                     "\t-x Use LGX (GC550) device specifically\n"
 #endif
-                    "\t-a Pulseaudio sink\tOutput audio to a Pulseaudio sink (useful when outputting video to V4L2Loopback)\n"
                     "\t-s Output only sound\n"
                     "\t-g Output video only\n"
                     "\t-f Use a fake USB stream containing unprocessed frames from a dump.bin file\n";

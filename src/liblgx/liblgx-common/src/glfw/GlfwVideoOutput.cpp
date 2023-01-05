@@ -1,11 +1,10 @@
-#include "GlfwFrameOutput.h"
+// Based on the work done by MasterAler (https://github.com/MasterAler/SampleYUVRenderer). Original shader code and OGL code lovingly adapted.
+
+#include "GlfwVideoOutput.h"
 
 #include <stdexcept>
 #include <GLFW/glfw3.h>
-#include <GL/gl.h>
-#include <vector>
 
-//Vertex matrix
 static const GLfloat vertexVertices[] = {
         -1.0f, -1.0f,
         1.0f, -1.0f,
@@ -13,7 +12,6 @@ static const GLfloat vertexVertices[] = {
         1.0f, 1.0f,
 };
 
-//Texture matrix
 static const GLfloat textureVertices[] = {
         0.0f, 1.0f,
         1.0f, 1.0f,
@@ -54,13 +52,13 @@ static const char* fragment_shader_text =
         "}";
 
 namespace glfw {
-    GlfwFrameOutput::GlfwFrameOutput() {
+    GlfwVideoOutput::GlfwVideoOutput() {
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialise GLFW3");
         }
     }
 
-    void GlfwFrameOutput::initialiseVideo() {
+    void GlfwVideoOutput::initialiseVideo() {
         window = glfwCreateWindow(1920, 1080, "lgx2userspace", nullptr, nullptr);
         if (!window) {
             throw std::runtime_error("Failed to create GLFW3 window");
@@ -86,8 +84,10 @@ namespace glfw {
         int vertexMaxLength = 4096;
         GLchar vertexErrorLog[4096]{0};
         glGetShaderInfoLog(vertexShader, vertexMaxLength, &vertexMaxLength, &vertexErrorLog[0]);
-        printf("ERRORLOG: %s\n", vertexErrorLog);
-
+        if (vertexMaxLength > 0) {
+            fprintf(stderr, "Vertex shader error: %s\n", vertexErrorLog);
+            throw std::runtime_error("Failed to compile vertex shader.");
+        }
 
         GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragmentShader, 1, &fragment_shader_text, nullptr);
@@ -95,8 +95,10 @@ namespace glfw {
         int maxLength = 4096;
         GLchar errorLog[4096]{0};
         glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, &errorLog[0]);
-        printf("ERRORLOG: %s\n", errorLog);
-
+        if (maxLength > 0) {
+            fprintf(stderr, "Fragment shader error: %s\n", errorLog);
+            throw std::runtime_error("Failed to compile fragment shader.");
+        }
 
         GLuint shaderProgram = glCreateProgram();
         glAttachShader(shaderProgram, fragmentShader);
@@ -118,7 +120,7 @@ namespace glfw {
         glGenTextures(3, textures);
     }
 
-    void GlfwFrameOutput::videoFrameAvailable(uint32_t *image) {
+    void GlfwVideoOutput::videoFrameAvailable(uint32_t *image) {
         uint8_t *rawImage = reinterpret_cast<uint8_t *>(image);
         uint8_t y[1920*1080];
         uint8_t u[1920*1080];
@@ -179,7 +181,7 @@ namespace glfw {
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
-    void GlfwFrameOutput::display() {
+    void GlfwVideoOutput::display() {
         glfwPollEvents();
 
         glfwSwapBuffers(window);
@@ -189,23 +191,7 @@ namespace glfw {
         }
     }
 
-    void GlfwFrameOutput::shutdownVideo() {
-
-    }
-
-    void GlfwFrameOutput::initialiseAudio() {
-
-    }
-
-    void GlfwFrameOutput::audioFrameAvailable(uint32_t *audio) {
-
-    }
-
-    void GlfwFrameOutput::render() {
-
-    }
-
-    void GlfwFrameOutput::shutdownAudio() {
+    void GlfwVideoOutput::shutdownVideo() {
 
     }
 }

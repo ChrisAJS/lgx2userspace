@@ -13,12 +13,15 @@ set(BOOTSTRAP_SOURCES
         src/bootstrap/commanddata_lgx2.h)
 
 set(SDLOUTPUT_SOURCES
-        src/sdl/SdlFrameOutput.cpp
-        src/sdl/SdlFrameOutput.h)
+        src/sdl/SdlVideoOutput.cpp
+        src/sdl/SdlVideoOutput.h
+        src/sdl/SdlAudioOutput.cpp
+        src/sdl/SdlAudioOutput.h
+        )
 
 set(GLFWOUTPUT_SOURCES
-        src/glfw/GlfwFrameOutput.cpp
-        src/glfw/GlfwFrameOutput.h)
+        src/glfw/GlfwVideoOutput.cpp
+        src/glfw/GlfwVideoOutput.h)
 
 set(NULL_SOURCES
         src/NullVideoOutput.cpp

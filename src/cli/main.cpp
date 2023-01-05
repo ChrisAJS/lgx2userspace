@@ -8,7 +8,7 @@
 bool do_exit = false;
 
 int main(int argc, char **argv) {
-    std::cout << "lgx2userspace v0.2.0 ("<< GIT_BRANCH << "-" << GIT_REV << ")" << std::endl;
+    std::cout << "lgx2userspace-sdl " << APP_VERSION << " ("<< GIT_BRANCH << "-" << GIT_REV << " - " << GIT_TAG << ")" << std::endl;
 
     app::OptionParser optionParser{};
 
@@ -19,25 +19,22 @@ int main(int argc, char **argv) {
     lgx2::Logger *logger{optionParser.logger()};
     lgx2::VideoOutput *videoOutput{optionParser.videoOutput()};
     lgx2::AudioOutput *audioOutput{optionParser.audioOutput()};
-
     lgx2::Stream *stream{optionParser.stream()};
-    sdl::SdlFrameOutput sdlOutput{};
-    NOOPLogger noopLogger{};
 
     if (stream == nullptr) {
-        stream = new libusb::UsbStream();
+        stream = new libusb::UsbStream{};
     }
 
     if (videoOutput == nullptr) {
-        videoOutput = &sdlOutput;
+        videoOutput = new sdl::SdlVideoOutput{};
     }
 
     if (audioOutput == nullptr) {
-        audioOutput = &sdlOutput;
+        audioOutput = new sdl::SdlAudioOutput{};
     }
 
     if (logger == nullptr) {
-        logger = &noopLogger;
+        logger = new NOOPLogger{};
     }
 
     lgx2::Device device{stream, videoOutput, audioOutput, logger};
@@ -50,11 +47,11 @@ int main(int argc, char **argv) {
 
     device.initialise(targetDevice);
 
-    SDL_Event event;
-
     signal(SIGTERM, [](int) {
         do_exit = true;
     });
+
+    SDL_Event event;
 
     while (!do_exit) {
 

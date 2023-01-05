@@ -1,5 +1,5 @@
-#ifndef LGX2USERSPACE_GLFWFRAMEOUTPUT_H
-#define LGX2USERSPACE_GLFWFRAMEOUTPUT_H
+#ifndef LGX2USERSPACE_GLFWVIDEOOUTPUT_H
+#define LGX2USERSPACE_GLFWVIDEOOUTPUT_H
 
 #include "lgxdevice.h"
 #include <glad/glad.h>
@@ -7,9 +7,9 @@
 
 namespace glfw {
 
-    class GlfwFrameOutput : public lgx2::VideoOutput, public lgx2::AudioOutput {
+    class GlfwVideoOutput : public lgx2::VideoOutput {
     public:
-        GlfwFrameOutput();
+        GlfwVideoOutput();
 
         void initialiseVideo() override;
 
@@ -18,14 +18,6 @@ namespace glfw {
         void display() override;
 
         void shutdownVideo() override;
-
-        void initialiseAudio() override;
-
-        void audioFrameAvailable(uint32_t *audio) override;
-
-        void render() override;
-
-        void shutdownAudio() override;
 
     private:
         GLFWwindow *window{nullptr};
@@ -39,4 +31,4 @@ namespace glfw {
 
 }
 
-#endif //LGX2USERSPACE_GLFWFRAMEOUTPUT_H
+#endif //LGX2USERSPACE_GLFWVIDEOOUTPUT_H
