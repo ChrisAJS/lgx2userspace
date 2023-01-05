@@ -6,10 +6,10 @@
 #include <sstream>
 #include <algorithm>
 
-#include "lgxdevice.h"
-
 #include "bootstrap/commanddata_lgx2.h"
-#include "bootstrap/commanddata_lgx.h"
+#ifdef GC550_SUPPORT
+#   include "bootstrap/commanddata_lgx.h"
+#endif
 
 static void usbTransferComplete(struct libusb_transfer *transfer) {
     auto *stream = static_cast<libusb::UsbStream *>(transfer->user_data);
