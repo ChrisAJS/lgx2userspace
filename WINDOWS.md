@@ -62,5 +62,30 @@ Select the driver you have just created and tap next and finish.
 
 You are now ready to use the lgx2userspace driver.
 
+## Building on a Windows machine
+### Prerequisites
+The project uses CMake, Conan and a C++ toolchain to build the `lgx2userspace.exe` binary.
+
+As Conan is a python project, you will need to install python, which can be downloaded from [Python Releases for Windows](https://www.python.org/downloads/windows).
+
+CMake can be downloaded from the [CMake Github Releases page](https://github.com/Kitware/CMake/releases).
+
+You will need gcc and g++ in order to build the project, which can be installed as part of the [msys2 toolset](https://www.msys2.org/).
+
+### Building
+With CMake and Conan installed, building _should_ be as simple as cloning the project and navigating to it using cmd.exe:
+
+```bash
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+```
+
+**NOTE: This will download and build all the dependencies and will take a while depending on your machine.**
+
+
+
+
+
 ## Other info
 The icon for the app was made using the [Android asset studio](https://romannurik.github.io/AndroidAssetStudio/icons-launcher.html).
