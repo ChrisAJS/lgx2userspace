@@ -1,11 +1,12 @@
 #include "lgxdevice.h"
 
 #include <chrono>
+#include <stdexcept>
 
 namespace lgx2 {
 
-    Device::Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger)
-            : _stream{stream}, _videoOutput{videoOutput}, _audioOutput{audioOutput}, _logger{logger} {
+    Device::Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger, ErrorSink *errorSink)
+            : _stream{stream}, _videoOutput{videoOutput}, _audioOutput{audioOutput}, _logger{logger}, _errorSink{errorSink} {
         _onFrameData = [&](uint8_t *frameData) {
             onFrameData(frameData);
         };
@@ -16,11 +17,17 @@ namespace lgx2 {
     }
 
     void Device::initialise(lgx2::DeviceType deviceType) {
-        _videoOutput->initialiseVideo();
-        _audioOutput->initialiseAudio();
+        _errorSink->catchErrors([&]() {
+            if (!isDeviceAvailable(deviceType)) {
+                throw std::runtime_error("Target device is not available to use - is it plugged in?");
+            }
 
-        _stream->streamSetupCommands(deviceType);
-        _stream->queueFrameRead(&_onFrameData);
+            _videoOutput->initialiseVideo();
+            _audioOutput->initialiseAudio();
+
+            _stream->streamSetupCommands(deviceType);
+            _stream->queueFrameRead(&_onFrameData);
+        });
     }
 
     void Device::run() {

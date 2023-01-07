@@ -5,3 +5,4 @@
 #include "NullAudioOutput.h"
 #include "NullVideoOutput.h"
 #include "FakeUsbStream.h"
+#include "SimpleErrorSink.h"

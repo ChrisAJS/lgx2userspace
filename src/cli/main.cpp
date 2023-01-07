@@ -37,13 +37,14 @@ int main(int argc, char **argv) {
         logger = new NOOPLogger{};
     }
 
-    lgx2::Device device{stream, videoOutput, audioOutput, logger};
+#ifdef __MINGW32__
+    lgx2::ErrorSink *errorSink = new error::WindowsErrorSink();
+#else
+    lgx2::ErrorSink *errorSink = new error::SimpleErrorSink();
+#endif
+    lgx2::Device device{stream, videoOutput, audioOutput, logger, errorSink};
 
     lgx2::DeviceType targetDevice = optionParser.deviceType();
-
-    if (!device.isDeviceAvailable(targetDevice)) {
-        throw std::runtime_error("Target device is not available to use - is it plugged in?");
-    }
 
     device.initialise(targetDevice);
 

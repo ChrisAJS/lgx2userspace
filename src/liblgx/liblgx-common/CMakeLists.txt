@@ -37,6 +37,10 @@ set(USB_SOURCES
         src/usb/UsbStream.cpp
         src/usb/UsbStream.h)
 
+set(ERRORSINK_SOURCES
+        src/SimpleErrorSink.cpp
+        src/SimpleErrorSink.h)
+
 add_library(liblgx-common STATIC
         ${SDLOUTPUT_SOURCES}
         ${GLFWOUTPUT_SOURCES}
@@ -44,6 +48,7 @@ add_library(liblgx-common STATIC
         ${USB_SOURCES}
         ${BOOTSTRAP_SOURCES}
         ${FAKE_USB_SOURCES}
+        ${ERRORSINK_SOURCES}
         src/lgxcommon.h)
 
 target_include_directories(liblgx-common PUBLIC src)

@@ -17,6 +17,11 @@ namespace lgx2 {
         LGX2
     };
 
+    class ErrorSink {
+    public:
+        virtual void catchErrors(const std::function<void()> &run) = 0;
+    };
+
     class Logger {
     public:
         virtual void logTimeStart(const std::string &name) = 0;
@@ -68,7 +73,7 @@ namespace lgx2 {
 
     class Device {
     public:
-        Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger);
+        Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger, ErrorSink *errorSink);
 
         bool isDeviceAvailable(DeviceType deviceType);
 
@@ -83,6 +88,7 @@ namespace lgx2 {
         VideoOutput *_videoOutput;
         AudioOutput *_audioOutput;
         Logger *_logger;
+        ErrorSink *_errorSink;
 
         utils::FrameBuilder _frameBuilder;
 
