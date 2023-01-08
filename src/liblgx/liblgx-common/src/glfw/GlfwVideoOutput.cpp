@@ -56,6 +56,8 @@ namespace glfw {
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialise GLFW3");
         }
+
+        yuvImage = new uint8_t[1920*1080*3];
     }
 
     void GlfwVideoOutput::initialiseVideo() {
@@ -122,22 +124,19 @@ namespace glfw {
 
     void GlfwVideoOutput::videoFrameAvailable(uint32_t *image) {
         uint8_t *rawImage = reinterpret_cast<uint8_t *>(image);
-        uint8_t y[1920*1080];
-        uint8_t u[1920*1080];
-        uint8_t v[1920*1080];
 
         for(int i = 0; i < 1920*1080; i++) {
-            y[i] = rawImage[i*2];
+            yuvImage[i] = rawImage[i*2];
         }
 
         for(int i = 0; i < 1920*1080; i+=2) {
-            u[i] = rawImage[i*2+1];
-            u[i+1] = rawImage[i*2+1];
+            yuvImage[1920*1080 + i] = rawImage[i*2+1];
+            yuvImage[1920*1080 + i+1] = rawImage[i*2+1];
         }
 
         for(int i = 1; i < 1920*1080; i+=2) {
-            v[i] = rawImage[i*2+1];
-            v[i+1] = rawImage[i*2+1];
+            yuvImage[1920*1080*2 + i] = rawImage[i*2+1];
+            yuvImage[1920*1080*2 + i+1] = rawImage[i*2+1];
         }
 
         glActiveTexture(GL_TEXTURE0);
@@ -149,7 +148,7 @@ namespace glfw {
         glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
         glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 1920, 1080, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE,y);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 1920, 1080, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, yuvImage);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -159,7 +158,7 @@ namespace glfw {
         glActiveTexture(GL_TEXTURE1);//Activate texture unit GL_TEXTURE1
         glBindTexture(GL_TEXTURE_2D, textures[1]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 1920, 1080, 0, GL_LUMINANCE,
-                     GL_UNSIGNED_BYTE, (char *) u);
+                     GL_UNSIGNED_BYTE, (char *) yuvImage + 1920*1080);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -169,7 +168,7 @@ namespace glfw {
         glActiveTexture(GL_TEXTURE2);//Activate texture unit GL_TEXTURE2
         glBindTexture(GL_TEXTURE_2D, textures[2]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 1920, 1080, 0, GL_LUMINANCE,
-                     GL_UNSIGNED_BYTE, (char *) v);
+                     GL_UNSIGNED_BYTE, (char *) yuvImage + 1920*1080*2);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

@@ -23,10 +23,13 @@ namespace libusb {
 
         void submitTransfer(libusb_transfer *transfer);
 
+        void queueAllFrameReads();
+
     private:
         libusb_device_handle *_dev;
 
         std::vector<libusb_transfer*> _transfers;
+        libusb_transfer* _probeTransfer;
 
         std::vector<lgx2::DeviceType> _availableDevices;
 

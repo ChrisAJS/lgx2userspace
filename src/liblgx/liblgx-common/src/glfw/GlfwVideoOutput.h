@@ -27,6 +27,8 @@ namespace glfw {
         GLuint textureUniformV;
 
         GLuint textures[3]{0};
+
+        uint8_t *yuvImage;
     };
 
 }

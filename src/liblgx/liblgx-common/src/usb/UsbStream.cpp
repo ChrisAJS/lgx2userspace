@@ -5,11 +5,26 @@
 #include <system_error>
 #include <sstream>
 #include <algorithm>
+#include <cstring>
 
 #include "bootstrap/commanddata_lgx2.h"
 #ifdef GC550_SUPPORT
 #   include "bootstrap/commanddata_lgx.h"
 #endif
+
+static void probeTransferComplete(struct libusb_transfer *transfer) {
+    static uint8_t frameStart[] = { 0x00, 0xFF, 0xFF, 0xC0 };
+    auto *stream = static_cast<libusb::UsbStream *>(transfer->user_data);
+
+    if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
+        if (memcmp(transfer->buffer, frameStart, 4) == 0) {
+            printf("Found initial frame!\n");
+            stream->queueAllFrameReads();
+        } else {
+            stream->submitTransfer(transfer);
+        }
+    }
+}
 
 static void usbTransferComplete(struct libusb_transfer *transfer) {
     auto *stream = static_cast<libusb::UsbStream *>(transfer->user_data);
@@ -58,12 +73,16 @@ namespace libusb {
                         fprintf(stderr, "LGX (GC550) detected, but the device is not using USB3. Ensure you are using a USB3 port (often denoted with a specific colour on systems with both USB2 and 3) and that you are using a cable that is capable of USB3 speeds.\n");
                     }
                 }
+#else
+                else if (desc.idProduct == 0x4710) {
+                    printf("LGX (GC550) detected - but support for device not compiled in.\n");
+                }
 #endif
             }
         }
 
         libusb_free_device_list(list, (int) count);
-        _frameBuffer = new uint8_t[LGX_DATA_FRAME_LEN * 8];
+        _frameBuffer = new uint8_t[LGX_DATA_FRAME_LEN * 16];
     }
 
     UsbStream::~UsbStream() {
@@ -105,15 +124,13 @@ namespace libusb {
         int check = 0;
         int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x03, _frameBuffer, LGX_DATA_FRAME_LEN, &check, 100);
         if (res != LIBUSB_ERROR_TIMEOUT) {
-            printf("Skipping bootstrap - device is already producing frame data\n");
-            return;
+            throw std::runtime_error("Device already been bootstrapped. This results in garbage output. Please unplug and re-plug in the device.");
         } else {
-            printf("Did not receive a response from the device, assuming not bootstrapped\n");
+            printf("Bootstrapping the device\n");
         }
 
         int actualLength;
         uint8_t transferBuffer[512]{0};
-
 
         auto commands = std::istringstream{targetCommands};
         std::string command;
@@ -141,19 +158,13 @@ namespace libusb {
     void UsbStream::queueFrameRead(std::function<void(uint8_t *)> *onData) {
         _onFrameDataCallback = onData;
 
-        for (int i = 0; i < 8; i++) {
-            libusb_transfer *transfer = libusb_alloc_transfer(0);
+        _probeTransfer = libusb_alloc_transfer(0);
 
-            libusb_fill_bulk_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
-                                      _frameBuffer + LGX_DATA_FRAME_LEN * i, LGX_DATA_FRAME_LEN,
-                                      usbTransferComplete, this, 0);
+        libusb_fill_bulk_transfer(_probeTransfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
+                                  _frameBuffer, LGX_DATA_FRAME_LEN,
+                                  probeTransferComplete, this, 0);
 
-            _transfers.push_back(transfer);
-        }
-
-        for (int i = 0; i < 8; i++) {
-            libusb_submit_transfer(_transfers[i]);
-        }
+        libusb_submit_transfer(_probeTransfer);
     }
 
     void UsbStream::update() {
@@ -188,5 +199,22 @@ namespace libusb {
             libusb_free_transfer(transfer);
             _transfers.erase(std::find(_transfers.begin(), _transfers.end(), transfer));
         }
+    }
+
+    void UsbStream::queueAllFrameReads() {
+        for (int i = 0; i < 4; i++) {
+            libusb_transfer *transfer = libusb_alloc_transfer(0);
+
+            libusb_fill_bulk_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
+                                      _frameBuffer + LGX_DATA_FRAME_LEN * i, LGX_DATA_FRAME_LEN,
+                                      usbTransferComplete, this, 0);
+
+            _transfers.push_back(transfer);
+        }
+
+        for (int i = 1; i < 4; i++) {
+            libusb_submit_transfer(_transfers[i]);
+        }
+        libusb_submit_transfer(_transfers[0]);
     }
 }
