@@ -150,6 +150,9 @@ Go to OBS or other streaming software and select the LGX2 V4L2 source. You shoul
 ## Demo
 See it in action over at [YouTube](https://www.youtube.com/watch?v=-yzHMbUn-w0).
 
+# Getting in touch
+If you need help or want to have a discussion on proposed features or usability, join the [Discord server](https://discord.gg/bSVZBRjb).
+
 # Attributions
 This project uses the hard work of the following projects:
 
