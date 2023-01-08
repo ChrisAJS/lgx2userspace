@@ -35,13 +35,13 @@ To build the project, you will need:
 The following packages need to be installed:
 
 ```bash
-sudo apt install cmake libusb-dev libsdl2-dev libsdl2-gfx-dev libpulse-dev v4l2loopback-dkms v4l2loopback-utils libgtk4-dev
+sudo apt install cmake libusb-dev libsdl2-dev libsdl2-gfx-dev libpulse-dev v4l2loopback-dkms v4l2loopback-utils
 ```
 ### Arch Linux (Unconfirmed)
 The following packages need to be installed:
 
 ```bash
-sudo pacman -S cmake libusb sdl2 sdl2_gfx libpulse v4l2loopback-dkms v4l2loopback-utils gtk4
+sudo pacman -S cmake libusb sdl2 sdl2_gfx libpulse v4l2loopback-dkms v4l2loopback-utils
 ```
 
 ### Build Command
@@ -160,5 +160,5 @@ This project uses the hard work of the following projects:
  * [V4L2Loopback](https://github.com/umlaeute/v4l2loopback)
  * [SDL](https://www.libsdl.org/)
  * [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/)
- * [GTK+](https://www.gtk.org/)
  * [Catch2](https://github.com/catchorg/Catch2)
+ * [GLFW](https://www.glfw.org/)
