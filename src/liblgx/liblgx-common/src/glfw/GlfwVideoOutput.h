@@ -10,6 +10,7 @@ namespace glfw {
     class GlfwVideoOutput : public lgx2::VideoOutput {
     public:
         GlfwVideoOutput();
+        ~GlfwVideoOutput() noexcept;
 
         void initialiseVideo() override;
 
@@ -29,6 +30,17 @@ namespace glfw {
         GLuint textures[3]{0};
 
         uint8_t *yuvImage;
+        uint8_t *y;
+        uint8_t *u;
+        uint8_t *v;
+
+        void populateYuvImageFromFrame(uint32_t *image);
+
+        void populateTexture(uint8_t *textureData) const;
+
+        GLuint compileShader(int shaderType, const char *shaderSource) const;
+
+        GLuint compileShaderProgram() const;
     };
 
 }

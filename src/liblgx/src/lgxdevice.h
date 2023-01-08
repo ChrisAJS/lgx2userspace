@@ -47,6 +47,8 @@ namespace lgx2 {
 
     class VideoOutput {
     public:
+        virtual ~VideoOutput() = default;
+
         virtual void initialiseVideo() = 0;
 
         virtual void videoFrameAvailable(uint32_t *image) = 0;
