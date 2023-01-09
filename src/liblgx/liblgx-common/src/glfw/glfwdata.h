@@ -16,10 +16,10 @@ static const GLfloat textureVertices[] = {
 };
 
 static const char *vertexShaderSource =
-        "#version 330 core\n"
-        "in vec4 vertexIn; "
-        "in vec2 textureIn; "
-        "out vec2 textureOut;  "
+        "#version 120\n"
+        "attribute vec4 vertexIn; "
+        "attribute vec2 textureIn; "
+        "varying vec2 textureOut;  "
         "void main(void)           "
         "{                         "
         "    gl_Position = vertexIn; "
@@ -27,9 +27,8 @@ static const char *vertexShaderSource =
         "}";
 
 static const char *fragmentShaderSource =
-        "#version 330 core\n"
-        "layout(location = 0) out vec4 color;"
-        "in vec2 textureOut;"
+        "#version 120\n"
+        "varying vec2 textureOut;"
         "uniform sampler2D tex_y;"
         "uniform sampler2D tex_u;"
         "uniform sampler2D tex_v;"
@@ -41,10 +40,10 @@ static const char *fragmentShaderSource =
         "    float u = texture2D(tex_u, textureOut).r;"
         "    float v = texture2D(tex_v, textureOut).r;"
         ""
-        "    rgb.r =  clamp(y + (1.370705 * (v - 0.5)), 0, 1);"
-        "    rgb.g = clamp(y - (0.698001 * (v - 0.5)) - (0.337633 * (u - 0.5)), 0, 1);"
-        "    rgb.b = clamp(y + (1.732446 * (u - 0.5)), 0, 1);"
-        "    color = vec4(rgb, 1);"
+        "    rgb.r =  clamp(y + (1.370705 * (v - 0.5)), 0.0, 1.0);"
+        "    rgb.g = clamp(y - (0.698001 * (v - 0.5)) - (0.337633 * (u - 0.5)), 0.0, 1.0);"
+        "    rgb.b = clamp(y + (1.732446 * (u - 0.5)), 0.0, 1.0);"
+        "    gl_FragColor = vec4(rgb, 1);"
         "}";
 
 

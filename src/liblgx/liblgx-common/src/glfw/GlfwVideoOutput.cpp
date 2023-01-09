@@ -40,6 +40,10 @@ namespace glfw {
             }
         });
 
+        glfwSetWindowSizeCallback(window, [](GLFWwindow *window, int width, int height) {
+            glViewport(0, 0, width, height);
+        });
+
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         glViewport(0, 0, width, height);
@@ -59,9 +63,10 @@ namespace glfw {
     }
 
     void GlfwVideoOutput::display() {
-        glfwPollEvents();
 
         glfwSwapBuffers(window);
+
+        glfwPollEvents();
 
         if (glfwWindowShouldClose(window)) {
             throw std::runtime_error("Window closed");

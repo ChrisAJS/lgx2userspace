@@ -30,7 +30,11 @@ int main(int argc, char **argv) {
     }
 
     if (audioOutput == nullptr) {
-        audioOutput = new sdl::SdlAudioOutput{};
+#ifdef __MINGW32__
+        audioOutput = new NullAudioOutput{};
+#else
+        audioOutput = new ao::AoAudioOutput{};
+#endif
     }
 
     if (logger == nullptr) {
