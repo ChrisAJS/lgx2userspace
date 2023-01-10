@@ -29,16 +29,23 @@ namespace glfw {
 
         GLuint textures[3]{0};
 
+        lgx2::VideoScale targetScale;
         uint8_t *yuvImage;
+        int bufferWidth;
+        int bufferHeight;
+        int bufferSize;
+
         uint8_t *y;
+
         uint8_t *u;
+
         uint8_t *v;
 
         void populateYuvImageFromFrame(uint32_t *image);
 
-        static void populateTexture(uint8_t *textureData) ;
+        void populateTexture(uint8_t *textureData);
 
-        static GLuint compileShader(int shaderType, const char *shaderSource) ;
+        static GLuint compileShader(int shaderType, const char *shaderSource);
 
         GLuint compileShaderProgram() const;
     };
