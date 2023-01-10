@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 
     lgx2::DeviceType targetDevice = optionParser.deviceType();
 
-    device.initialise(targetDevice, lgx2::VideoScale::Half);
+    device.initialise(targetDevice, optionParser.scale());
 
     signal(SIGTERM, [](int) {
         do_exit = true;
