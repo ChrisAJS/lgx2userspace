@@ -5,6 +5,8 @@
 #include <map>
 #include "lgxdevice.h"
 
+#include <fstream>
+
 class ChronoLogger : public lgx2::Logger {
 public:
     ChronoLogger(bool summaryOnly);
@@ -16,6 +18,7 @@ public:
     void summarise() override;
 
 private:
+    std::fstream _logfile;
     bool _summaryOnly;
     uint64_t _appStart;
     std::map<std::string, std::vector<uint64_t>> _summaries;
