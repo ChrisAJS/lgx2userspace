@@ -17,7 +17,7 @@ namespace sdl {
         want.channels = 2;
         want.samples = 1024;
         want.callback = nullptr;
-        _audio = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0); //SDL_AUDIO_ALLOW_FORMAT_CHANGE
+        _audio = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
         SDL_PauseAudioDevice(_audio, 0);
     }
 
