@@ -39,6 +39,8 @@ int main(int argc, char **argv) {
 
 #ifdef __MINGW32__
     lgx2::ErrorSink *errorSink = new error::WindowsErrorSink();
+#elifdef __APPLE__
+    lgx2::ErrorSink *errorSink = new error::MacOsErrorSink();
 #else
     lgx2::ErrorSink *errorSink = new error::SimpleErrorSink();
 #endif

@@ -49,13 +49,15 @@ namespace sdl {
         int32_t pitch;
         int result = SDL_LockTexture(_texture, nullptr, (void **) &pixels, &pitch);
         if (pixels != nullptr && result == 0) {
+            int pitchInInts = pitch/4;
+
             if (_targetScale == lgx2::VideoScale::Full) {
                 memcpy(pixels, image, 1920 * 1080 * 2);
             } else if (_targetScale == lgx2::VideoScale::Half) {
                 for (int y = 0; y < 540; y++) {
                     for (int x = 0; x < 960; x++) {
-                        int frameOffset = ((y * 960) + x) << 1;
-                        int textureOffset = ((y * pitch/4) + x);
+                        int frameOffset = ((y * 960) + x) * 2;
+                        int textureOffset = ((y * pitchInInts) + x);
                         pixels[textureOffset] = image[frameOffset];
                     }
                 }
@@ -64,12 +66,11 @@ namespace sdl {
                     for (int x = 0; x < 1920; x += 4) {
                         int frameOffset = y * 1920 + x;
                         int textureOffset = (((y >> 2) * (pitch>>2)) + (x >> 2));
-                        *(pixels + textureOffset) = image[frameOffset];
+                        pixels[textureOffset] = image[frameOffset];
                     }
                 }
             }
         }
-
 
         SDL_UnlockTexture(_texture);
     }

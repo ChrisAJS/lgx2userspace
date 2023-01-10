@@ -30,10 +30,10 @@ int main(int argc, char **argv) {
     }
 
     if (audioOutput == nullptr) {
-#ifdef __MINGW32__
-        audioOutput = new NullAudioOutput{};
-#else
+#if !defined(__MINGW32__) && !defined(__APPLE__)
         audioOutput = new ao::AoAudioOutput{};
+#else
+        audioOutput = new NullAudioOutput{};
 #endif
     }
 
@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
 
 #ifdef __MINGW32__
     lgx2::ErrorSink *errorSink = new error::WindowsErrorSink();
+#elifdef __APPLE__
+    lgx2::ErrorSink *errorSink = new error::MacOsErrorSink();
 #else
     lgx2::ErrorSink *errorSink = new error::SimpleErrorSink();
 #endif

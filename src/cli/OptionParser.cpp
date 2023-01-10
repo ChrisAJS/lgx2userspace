@@ -32,6 +32,7 @@ bool app::OptionParser::process(int argc, char **argv) {
         switch(getopt(argc, argv, "vVa:d:hxsgfS:"))
         {
 #ifndef __MINGW32__
+#ifndef __APPLE__
             case 'a':
                 std::cout << "Attempting to output to Pulseaudio sink: " << optarg << std::endl;
                 _audioOutput = new pulse::PulseAudioOutput(optarg);
@@ -40,6 +41,7 @@ bool app::OptionParser::process(int argc, char **argv) {
                 std::cout << "Attempting to output to V4L2Loopback device: " << optarg << std::endl;
                 _videoOutput = new v4l::V4LFrameOutput(optarg);
                 continue;
+#endif
 #endif
             case 'f':
                 std::cout << "Using fake USB stream - reading data from 'dump.bin'" << std::endl;
@@ -81,8 +83,10 @@ bool app::OptionParser::process(int argc, char **argv) {
                     "\t-v\tPrint diagnostics information summary at end of execution, useful when submitting bugs\n"
                     "\t-V\tPrint diagnostic information during execution\n"
 #ifndef __MINGW32__
+#ifndef __APPLE__
                     "\t-d V4L2LoopbackDevice\tSpecify the V4L2Loopback device to output video to (e.g. /dev/video99)\n\n"
                     "\t-a Pulseaudio sink\tOutput audio to a Pulseaudio sink (useful when outputting video to V4L2Loopback)\n"
+#endif
 #endif
 #ifdef GC550_SUPPORT
                     "\t-x Use LGX (GC550) device specifically\n"

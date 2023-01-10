@@ -31,10 +31,16 @@ set(LIBLGX_SOURCES ${LIBLGX_BASE_SOURCES} ${LOGGER_SOURCES})
 add_library(liblgx STATIC ${LIBLGX_SOURCES})
 
 # Platform specific configurations
-if (UNIX)
+if (CMAKE_SYSTEM MATCHES Linux)
     message("Detected Linux system")
     add_subdirectory(liblgx-linux)
     target_link_libraries(liblgx PUBLIC liblgx-linux)
+endif()
+
+if (CMAKE_SYSTEM MATCHES Darwin)
+    message("Detected Mac OS system")
+    add_subdirectory(liblgx-macos)
+    target_link_libraries(liblgx PUBLIC liblgx-macos)
 endif()
 
 IF (CMAKE_SYSTEM MATCHES Windows)
