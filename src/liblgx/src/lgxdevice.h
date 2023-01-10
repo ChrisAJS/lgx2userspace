@@ -45,11 +45,17 @@ namespace lgx2 {
         virtual void shutdownStream() = 0;
     };
 
+    enum class VideoScale {
+        Full,
+        Half,
+        Quarter
+    };
+
     class VideoOutput {
     public:
         virtual ~VideoOutput() = default;
 
-        virtual void initialiseVideo() = 0;
+        virtual void initialiseVideo(VideoScale scale) = 0;
 
         virtual void videoFrameAvailable(uint32_t *image) = 0;
 
@@ -79,7 +85,7 @@ namespace lgx2 {
 
         bool isDeviceAvailable(DeviceType deviceType);
 
-        void initialise(DeviceType deviceType);
+        void initialise(DeviceType deviceType, VideoScale videoScale);
 
         void run();
 

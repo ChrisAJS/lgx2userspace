@@ -10,7 +10,7 @@ namespace sdl {
     public:
         SdlVideoOutput();
 
-        void initialiseVideo() override;
+        void initialiseVideo(lgx2::VideoScale scale) override;
 
         void videoFrameAvailable(uint32_t *image) override;
 
@@ -22,6 +22,7 @@ namespace sdl {
         SDL_Window *_window{};
         SDL_Renderer *_renderer{};
         SDL_Texture *_texture{};
+        lgx2::VideoScale _targetScale{lgx2::VideoScale::Full};
     };
 }
 

@@ -11,11 +11,23 @@ namespace sdl {
         }
     }
 
-    void SdlVideoOutput::initialiseVideo() {
-        _window = SDL_CreateWindow("lgx2userspace",
+    void SdlVideoOutput::initialiseVideo(lgx2::VideoScale scale) {
+        _targetScale = scale;
+        int width = 1920;
+        int height = 1080;
+
+        if (scale == lgx2::VideoScale::Half) {
+            width = 1920 / 2;
+            height = 1080 / 2;
+        } else if (scale == lgx2::VideoScale::Quarter) {
+            width = 1920 / 4;
+            height = 1080 / 4;
+        }
+
+        _window = SDL_CreateWindow("lgx2userspace - sdl",
                                    SDL_WINDOWPOS_UNDEFINED,
                                    SDL_WINDOWPOS_UNDEFINED,
-                                   1920, 1080,
+                                   width, height,
                                    SDL_WINDOW_RESIZABLE);
         _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
@@ -27,18 +39,38 @@ namespace sdl {
                 _renderer,
                 SDL_PIXELFORMAT_YUY2,
                 SDL_TEXTUREACCESS_STREAMING,
-                1920,
-                1080);
+                width,
+                height);
     }
 
 
     void SdlVideoOutput::videoFrameAvailable(uint32_t *image) {
-        uint8_t *pixels{nullptr};
+        uint32_t *pixels{nullptr};
         int32_t pitch;
         int result = SDL_LockTexture(_texture, nullptr, (void **) &pixels, &pitch);
         if (pixels != nullptr && result == 0) {
-            memcpy(pixels, image, 1920 * 1080 * 2);
+            if (_targetScale == lgx2::VideoScale::Full) {
+                memcpy(pixels, image, 1920 * 1080 * 2);
+            } else if (_targetScale == lgx2::VideoScale::Half) {
+                for (int y = 0; y < 540; y++) {
+                    for (int x = 0; x < 960; x++) {
+                        int frameOffset = ((y * 960) + x) << 1;
+                        int textureOffset = ((y * pitch/4) + x);
+                        pixels[textureOffset] = image[frameOffset];
+                    }
+                }
+            } else {
+                for (int y = 0; y < 1080; y += 4) {
+                    for (int x = 0; x < 1920; x += 4) {
+                        int frameOffset = y * 1920 + x;
+                        int textureOffset = (((y >> 2) * (pitch>>2)) + (x >> 2));
+                        *(pixels + textureOffset) = image[frameOffset];
+                    }
+                }
+            }
         }
+
+
         SDL_UnlockTexture(_texture);
     }
 

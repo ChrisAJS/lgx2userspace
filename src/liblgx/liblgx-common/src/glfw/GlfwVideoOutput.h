@@ -12,7 +12,7 @@ namespace glfw {
         GlfwVideoOutput();
         ~GlfwVideoOutput() noexcept;
 
-        void initialiseVideo() override;
+        void initialiseVideo(lgx2::VideoScale scale) override;
 
         void videoFrameAvailable(uint32_t *image) override;
 
@@ -23,9 +23,9 @@ namespace glfw {
     private:
         GLFWwindow *window{nullptr};
 
-        GLuint textureUniformY;
-        GLuint textureUniformU;
-        GLuint textureUniformV;
+        GLint textureUniformY{-1};
+        GLint textureUniformU{-1};
+        GLint textureUniformV{-1};
 
         GLuint textures[3]{0};
 
@@ -36,9 +36,9 @@ namespace glfw {
 
         void populateYuvImageFromFrame(uint32_t *image);
 
-        void populateTexture(uint8_t *textureData) const;
+        static void populateTexture(uint8_t *textureData) ;
 
-        GLuint compileShader(int shaderType, const char *shaderSource) const;
+        static GLuint compileShader(int shaderType, const char *shaderSource) ;
 
         GLuint compileShaderProgram() const;
     };

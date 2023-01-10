@@ -19,7 +19,7 @@ namespace glfw {
         delete[] yuvImage;
     }
 
-    void GlfwVideoOutput::initialiseVideo() {
+    void GlfwVideoOutput::initialiseVideo(lgx2::VideoScale scale) {
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialise GLFW3");
         }
@@ -40,7 +40,7 @@ namespace glfw {
             }
         });
 
-        glfwSetWindowSizeCallback(window, [](GLFWwindow *window, int width, int height) {
+        glfwSetWindowSizeCallback(window, [](GLFWwindow *, int width, int height) {
             glViewport(0, 0, width, height);
         });
 
@@ -96,7 +96,7 @@ namespace glfw {
         return shaderProgram;
     }
 
-    GLuint GlfwVideoOutput::compileShader(int shaderType, const char *shaderSource) const {
+    GLuint GlfwVideoOutput::compileShader(int shaderType, const char *shaderSource) {
         GLuint vertexShader = glCreateShader(shaderType);
         glShaderSource(vertexShader, 1, &shaderSource, nullptr);
         glCompileShader(vertexShader);
@@ -139,7 +139,7 @@ namespace glfw {
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
-    void GlfwVideoOutput::populateTexture(uint8_t *textureData) const {
+    void GlfwVideoOutput::populateTexture(uint8_t *textureData) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 1920, 1080, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, textureData);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -148,7 +148,7 @@ namespace glfw {
     }
 
     void GlfwVideoOutput::populateYuvImageFromFrame(uint32_t *image) {
-        uint8_t *rawImage = reinterpret_cast<uint8_t *>(image);
+        auto *rawImage = reinterpret_cast<uint8_t *>(image);
 
         for(int i = 0; i < 1920*1080; i++) {
             y[i] = rawImage[i * 2];
