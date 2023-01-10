@@ -8,11 +8,11 @@ FakeUsbStream::FakeUsbStream() {
     frameData = new uint8_t[0x1FC000];
 }
 
-bool FakeUsbStream::deviceAvailable(lgx2::DeviceType deviceType) {
+bool FakeUsbStream::deviceAvailable(lgx2::DeviceType) {
     return true;
 }
 
-void FakeUsbStream::streamSetupCommands(lgx2::DeviceType deviceType) {
+void FakeUsbStream::streamSetupCommands(lgx2::DeviceType) {
     // No-op
 }
 

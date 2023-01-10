@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 
     lgx2::DeviceType targetDevice = optionParser.deviceType();
 
-    device.initialise(targetDevice);
+    device.initialise(targetDevice, optionParser.scale());
 
     signal(SIGTERM, [](int) {
         do_exit = true;

@@ -16,16 +16,17 @@ namespace lgx2 {
         return _stream->deviceAvailable(device);
     }
 
-    void Device::initialise(lgx2::DeviceType deviceType) {
+    void Device::initialise(lgx2::DeviceType deviceType, lgx2::VideoScale videoScale) {
         _errorSink->catchErrors([&]() {
             if (!isDeviceAvailable(deviceType)) {
                 throw std::runtime_error("Target device is not available to use - is it plugged in?");
             }
 
-            _videoOutput->initialiseVideo();
+            _stream->streamSetupCommands(deviceType);
+
+            _videoOutput->initialiseVideo(videoScale);
             _audioOutput->initialiseAudio();
 
-            _stream->streamSetupCommands(deviceType);
             _stream->queueFrameRead(&_onFrameData);
         });
     }

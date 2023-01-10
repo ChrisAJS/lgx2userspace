@@ -9,7 +9,7 @@ namespace v4l {
     public:
         explicit V4LFrameOutput(const std::string &deviceName);
 
-        void initialiseVideo() override;
+        void initialiseVideo(lgx2::VideoScale scale) override;
 
         void videoFrameAvailable(uint32_t *image) override;
 
