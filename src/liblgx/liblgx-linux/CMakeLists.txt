@@ -10,9 +10,9 @@ set(PULSE_SOURCES
         src/pulseaudio/PulseAudioOutput.cpp
         src/pulseaudio/PulseAudioOutput.h)
 
-set(LIBAO_SOURCES
-        src/libao/AoAudioOutput.cpp
-        src/libao/AoAudioOutput.h)
+#set(LIBAO_SOURCES
+#        src/libao/AoAudioOutput.cpp
+#        src/libao/AoAudioOutput.h)
 
 add_library(liblgx-linux STATIC
         ${V4LOUTPUT_SOURCES}
@@ -27,7 +27,7 @@ target_include_directories(liblgx-linux PRIVATE ../src)
 # in a different way. This will hopefully be pulled up into common once
 # the performance difference between prebuilt linux libs and conan built
 # libraries are understood
-target_link_libraries(liblgx-linux PUBLIC SDL2 pulse-simple ao)
+target_link_libraries(liblgx-linux PUBLIC SDL2 pulse-simple)
 
 add_dependencies(liblgx-linux liblgx)
 
