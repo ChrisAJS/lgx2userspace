@@ -10,9 +10,9 @@ set(PULSE_SOURCES
         src/pulseaudio/PulseAudioOutput.cpp
         src/pulseaudio/PulseAudioOutput.h)
 
-set(LIBAO_SOURCES
-        src/libao/AoAudioOutput.cpp
-        src/libao/AoAudioOutput.h)
+#set(LIBAO_SOURCES
+#        src/libao/AoAudioOutput.cpp
+#        src/libao/AoAudioOutput.h)
 
 add_library(liblgx-linux STATIC
         ${V4LOUTPUT_SOURCES}

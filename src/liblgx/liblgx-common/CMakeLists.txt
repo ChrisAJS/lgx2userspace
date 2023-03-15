@@ -18,10 +18,10 @@ set(SDLOUTPUT_SOURCES
         src/sdl/SdlAudioOutput.cpp
         src/sdl/SdlAudioOutput.h
         )
-
-set(GLFWOUTPUT_SOURCES
-        src/glfw/GlfwVideoOutput.cpp
-        src/glfw/GlfwVideoOutput.h)
+#
+#set(GLFWOUTPUT_SOURCES
+#        src/glfw/GlfwVideoOutput.cpp
+#        src/glfw/GlfwVideoOutput.h)
 
 set(NULL_SOURCES
         src/NullVideoOutput.cpp
