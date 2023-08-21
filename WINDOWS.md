@@ -1,7 +1,7 @@
 # Lgx2userspace Driver on Windows
 How did we end up here?
 
-If you're here because you can't get the official driver working on Windows 11, [there are steps here explaining how you can get the driver to work](https://www.youtube.com/watch?v=4Y-IqEoB7HI&feature=youtu.be). Shout out to [Mistatcx and their Reddit post](https://www.reddit.com/r/AverMedia/comments/15w84ot/comment/jx1h70s/?context=3).
+If you're here because you can't get the official driver working on Windows 11, [there are steps here explaining how you can get the driver to work](https://youtu.be/pi68dlDiizQ). Shout out to [Mistatcx and their Reddit post](https://www.reddit.com/r/AverMedia/comments/15w84ot/comment/jx1h70s/?context=3).
 
 It's possible (though not recommended) to run the lgx2userspace driver on Windows, however for it to work correctly
 some third-party software needs to be used.
