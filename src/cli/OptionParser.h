@@ -17,9 +17,9 @@ namespace app {
         lgx2::VideoScale scale();
 
     private:
-        lgx2::VideoOutput *_videoOutput;
-        lgx2::AudioOutput *_audioOutput;
-        lgx2::Logger *_logger;
+        lgx2::VideoOutput *_videoOutput{nullptr};
+        lgx2::AudioOutput *_audioOutput{nullptr};
+        lgx2::Logger *_logger{nullptr};
         lgx2::DeviceType _deviceType{lgx2::DeviceType::LGX2};
         lgx2::Stream *_stream{nullptr};
         lgx2::VideoScale _scale{lgx2::VideoScale::Full};

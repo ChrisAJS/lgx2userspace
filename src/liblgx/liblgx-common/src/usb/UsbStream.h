@@ -2,7 +2,7 @@
 #define LGX2USERSPACE_USBSTREAM_H
 
 #include <vector>
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include "lgxdevice.h"
 
 namespace libusb {

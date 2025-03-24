@@ -1,19 +1,20 @@
 
 #include <iostream>
-#include <csignal>
 #include <liblgx.h>
 #include "OptionParser.h"
 #include "../version.h"
 
-bool do_exit = false;
+#define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL_main.h>
 
-int main(int argc, char **argv) {
+
+SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     std::cout << "lgx2userspace-sdl " << APP_VERSION << " ("<< GIT_BRANCH << "-" << GIT_REV << " - " << GIT_TAG << ")" << std::endl;
 
     app::OptionParser optionParser{};
 
     if (!optionParser.process(argc, argv)) {
-        return 0;
+        return SDL_APP_FAILURE;
     }
 
     lgx2::Logger *logger{optionParser.logger()};
@@ -44,32 +45,37 @@ int main(int argc, char **argv) {
 #else
     lgx2::ErrorSink *errorSink = new error::SimpleErrorSink();
 #endif
-    lgx2::Device device{stream, videoOutput, audioOutput, logger, errorSink};
+    lgx2::Device *device = new lgx2::Device{stream, videoOutput, audioOutput, logger, errorSink};
 
-    lgx2::DeviceType targetDevice = optionParser.deviceType();
+    const lgx2::DeviceType targetDevice = optionParser.deviceType();
 
-    device.initialise(targetDevice, optionParser.scale());
+    device->initialise(targetDevice, optionParser.scale());
 
-    signal(SIGTERM, [](int) {
-        do_exit = true;
-    });
-
-    SDL_Event event;
-
-    while (!do_exit) {
-
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                do_exit = true;
-            }
-        }
-
-        device.run();
-    }
-
-    device.shutdown();
+    *appstate = device;
 
     logger->summarise();
 
-    return 0;
+    return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
+    if (event->type == SDL_EVENT_QUIT) {
+        return SDL_APP_SUCCESS;
+    }
+
+    return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppIterate(void *appstate) {
+    lgx2::Device *device = static_cast<lgx2::Device *>(appstate);
+    device->run();
+    return SDL_APP_CONTINUE;
+}
+
+void SDL_AppQuit(void *appstate, SDL_AppResult
+    result) {
+    lgx2::Device *device = static_cast<lgx2::Device *>(appstate);
+
+    device->shutdown();
+    delete device;
 }

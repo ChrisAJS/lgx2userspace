@@ -16,7 +16,7 @@ namespace lgx2 {
         return _stream->deviceAvailable(device);
     }
 
-    void Device::initialise(lgx2::DeviceType deviceType, lgx2::VideoScale videoScale) {
+    void Device::initialise(DeviceType deviceType, VideoScale videoScale) {
         _errorSink->catchErrors([&]() {
             if (!isDeviceAvailable(deviceType)) {
                 throw std::runtime_error("Target device is not available to use - is it plugged in?");

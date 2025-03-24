@@ -43,7 +43,6 @@ set(ERRORSINK_SOURCES
 
 add_library(liblgx-common STATIC
         ${SDLOUTPUT_SOURCES}
-        ${GLFWOUTPUT_SOURCES}
         ${NULL_SOURCES}
         ${USB_SOURCES}
         ${BOOTSTRAP_SOURCES}
@@ -56,6 +55,7 @@ target_include_directories(liblgx-common PUBLIC ${PLATFORM_INCLUDES})
 target_include_directories(liblgx-common PRIVATE ../src)
 
 target_link_libraries(liblgx-common PUBLIC ${PLATFORM_LIBS})
+target_link_directories(liblgx-common PUBLIC ${PLATFORM_LIBS_PATH})
 
 add_dependencies(liblgx-common liblgx)
 

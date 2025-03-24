@@ -1,6 +1,6 @@
 #include "UsbStream.h"
 
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include <exception>
 #include <system_error>
 #include <sstream>

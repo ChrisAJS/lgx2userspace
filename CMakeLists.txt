@@ -6,7 +6,7 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-OPTION(ENABLE_LGX_GC550_SUPPORT "Enables LGX (GC550) support which will prevent further use of the LGX with the official Windows driver" OFF)
+OPTION(ENABLE_LGX_GC550_SUPPORT "Enables LGX (GC550) support which will prevent further use of the LGX with the official Windows driver" ON)
 
 if (ENABLE_LGX_GC550_SUPPORT)
     message("You have opted to build in LGX (GC550) support into the userspace driver.")
@@ -19,6 +19,9 @@ if (ENABLE_LGX_GC550_SUPPORT)
 else()
     message("Dangerous LGX (GC550) support will not be compiled into the lgx2userspace executable.")
 endif()
+
+set(SDL_STATIC ON)
+add_subdirectory(vendor/SDL)
 
 add_subdirectory(src/liblgx)
 add_subdirectory(src/cli)
