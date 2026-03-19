@@ -21,11 +21,21 @@ endif()
 
 include(${CMAKE_BINARY_DIR}/conan.cmake)
 
-conan_cmake_configure(REQUIRES libusb/1.0.26 sdl/2.26.1 glfw/3.3.8 glad/0.1.36 opengl/system GENERATORS cmake_find_package)
+conan_cmake_configure(
+    REQUIRES libusb/1.0.26 sdl/2.32.10 glfw/3.3.8 glad/0.1.36 opengl/system
+    GENERATORS CMakeDeps CMakeToolchain
+)
 
 conan_cmake_autodetect(settings)
 
-conan_cmake_install(PATH_OR_REFERENCE . BUILD missing REMOTE conancenter SETTINGS ${settings} os=${CONAN_OS})
+conan_cmake_install(
+    PATH_OR_REFERENCE .
+    BUILD missing
+    REMOTE conancenter
+    SETTINGS ${settings} os=${CONAN_OS}
+	OPTIONS
+    	sdl/*:wayland=False
+)
 
 find_package(SDL2)
 find_package(libusb)
@@ -33,5 +43,5 @@ find_package(glfw3)
 find_package(glad)
 find_package(opengl_system)
 
-set(PLATFORM_LIBS SDL2::SDL2main SDL2::SDL2 glfw::glfw glad::glad libusb::libusb opengl::opengl ${ADDITIONAL_LIBS})
+set(PLATFORM_LIBS SDL2::SDL2main SDL2::SDL2 glfw glad::glad libusb::libusb opengl::opengl ${ADDITIONAL_LIBS})
 set(PLATFORM_INCLUDES ${SDL2_INCLUDE_DIRS} ${libusb_INCLUDE_DIRS} ${glfw_INCLUDE_DIRS} ${glad_INCLUDE_DIRS} ${opengl_INCLUDE_DIRS})
