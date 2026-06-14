@@ -16,14 +16,27 @@ static void probeTransferComplete(struct libusb_transfer *transfer) {
     static uint8_t frameStart[] = { 0x00, 0xFF, 0xFF, 0xC0 };
     auto *stream = static_cast<libusb::UsbStream *>(transfer->user_data);
 
-    if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
-        if (memcmp(transfer->buffer, frameStart, 4) == 0) {
-            printf("Found initial frame!\n");
-            stream->queueAllFrameReads();
-        } else {
-            stream->submitTransfer(transfer);
-        }
+    if (transfer->status == LIBUSB_TRANSFER_COMPLETED &&
+        memcmp(transfer->buffer, frameStart, 4) == 0) {
+        printf("Found initial frame!\n");
+        // Enqueue probe data as the first chunk — it starts at the frame boundary,
+        // so discarding it would cause the first produced frame to be a splice of two frames.
+        stream->onFrameData(transfer);
+        stream->discardTransfer(transfer);
+        stream->queueAllFrameReads();
+        return;
     }
+
+    // After a correct bootstrap the device should start at a frame boundary immediately.
+    // Retrying a handful of times handles any transient buffering but if we never find
+    // the marker something is genuinely wrong — exit rather than accumulate garbage.
+    if (!stream->recordProbeAttempt()) {
+        fprintf(stderr, "Device did not start sending at a frame boundary after multiple attempts — try replugging\n");
+        stream->signalError("No frame start found");
+        return;
+    }
+
+    stream->submitTransfer(transfer);
 }
 
 static void usbTransferComplete(struct libusb_transfer *transfer) {
@@ -31,9 +44,12 @@ static void usbTransferComplete(struct libusb_transfer *transfer) {
 
     if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
         stream->onFrameData(transfer);
-    } else {
-        printf("USB read error: %d\n", transfer->status);
-        exit(-1);
+    } else if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
+        const char *msg = transfer->status == LIBUSB_TRANSFER_NO_DEVICE
+            ? "USB capture device was disconnected"
+            : "USB read error during capture";
+        fprintf(stderr, "%s (status %d)\n", msg, transfer->status);
+        stream->signalError(msg);
     }
 
     stream->submitTransfer(transfer);
@@ -43,7 +59,7 @@ static void usbTransferComplete(struct libusb_transfer *transfer) {
 namespace libusb {
     static const int LGX_DATA_FRAME_LEN = 0x1FC000;
 
-    UsbStream::UsbStream() : _dev{nullptr}, _onFrameDataCallback{}, _shuttingDown{false} {
+    UsbStream::UsbStream() : _dev{nullptr}, _onFrameDataCallback{} {
         libusb_init(nullptr);
 
         libusb_device **list = nullptr;
@@ -75,7 +91,7 @@ namespace libusb {
                 }
 #else
                 else if (desc.idProduct == 0x4710) {
-                    printf("LGX (GC550) detected - but support for device not compiled in.\n");
+                    fprintf(stderr, "LGX (GC550) detected - but support for device not compiled in.\n");
                 }
 #endif
             }
@@ -153,6 +169,8 @@ namespace libusb {
                 }
             }
         }
+
+        printf("Bootstrapping complete\n");
     }
 
     void UsbStream::queueFrameRead(std::function<void(uint8_t *)> *onData) {
@@ -164,57 +182,103 @@ namespace libusb {
                                   _frameBuffer, LGX_DATA_FRAME_LEN,
                                   probeTransferComplete, this, 0);
 
+        _transfers.push_back(_probeTransfer);
         libusb_submit_transfer(_probeTransfer);
+
+        _readThread = std::thread(&UsbStream::readLoop, this);
     }
 
     void UsbStream::update() {
-        libusb_handle_events(nullptr);
+        if (_hasError.load(std::memory_order_acquire)) {
+            throw std::runtime_error(_errorMessage);
+        }
+
+        std::vector<uint8_t> frame;
+        {
+            std::lock_guard<std::mutex> lock(_queueMutex);
+            if (_frameQueue.empty()) return;
+            frame = std::move(_frameQueue.front());
+            _frameQueue.pop();
+        }
+        (*_onFrameDataCallback)(frame.data());
     }
 
     void UsbStream::onFrameData(libusb_transfer *transfer) {
-        if (!_shuttingDown) {
-            (*_onFrameDataCallback)(transfer->buffer);
+        if (_shuttingDown) return;
+        std::lock_guard<std::mutex> lock(_queueMutex);
+        if (static_cast<int>(_frameQueue.size()) < MAX_QUEUE_DEPTH) {
+            _frameQueue.emplace(transfer->buffer, transfer->buffer + transfer->actual_length);
+        }
+    }
+
+    void UsbStream::readLoop() {
+        struct timeval tv{0, 100000};  // 100ms timeout so shutdown is responsive
+        bool cancelledAll = false;
+
+        while (true) {
+            libusb_handle_events_timeout(nullptr, &tv);
+
+            if (_shuttingDown && !cancelledAll) {
+                cancelledAll = true;
+                for (auto *transfer : _transfers) {
+                    libusb_cancel_transfer(transfer);
+                }
+            }
+
+            if (_transfers.empty()) break;
         }
     }
 
     void UsbStream::shutdownStream() {
-
         _shuttingDown = true;
-
-        while (!_transfers.empty()) {
-            libusb_handle_events(nullptr);
-        }
+        _readThread.join();
 
         delete[] _frameBuffer;
-
         libusb_release_interface(_dev, 0);
+        libusb_reset_device(_dev);
         libusb_close(_dev);
     }
 
     void UsbStream::submitTransfer(libusb_transfer *transfer) {
         if (!_shuttingDown) {
+            static constexpr auto kInterval = std::chrono::nanoseconds(1'000'000'000 / 60);
+            auto now = std::chrono::steady_clock::now();
+            auto remaining = kInterval - (now - _lastSubmitTime);
+            if (remaining > std::chrono::nanoseconds(0)) {
+                std::this_thread::sleep_for(remaining);
+            }
+            _lastSubmitTime = std::chrono::steady_clock::now();
             libusb_submit_transfer(transfer);
         } else {
-            libusb_cancel_transfer(transfer);
             libusb_free_transfer(transfer);
             _transfers.erase(std::find(_transfers.begin(), _transfers.end(), transfer));
         }
     }
 
+    void UsbStream::discardTransfer(libusb_transfer *transfer) {
+        _transfers.erase(std::find(_transfers.begin(), _transfers.end(), transfer));
+        libusb_free_transfer(transfer);
+    }
+
+    bool UsbStream::recordProbeAttempt() {
+        return ++_probeAttempts <= MAX_PROBE_ATTEMPTS;
+    }
+
+    void UsbStream::signalError(const char *message) {
+        _errorMessage = message;
+        _hasError.store(true, std::memory_order_release);
+    }
+
     void UsbStream::queueAllFrameReads() {
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 2; i++) {
             libusb_transfer *transfer = libusb_alloc_transfer(0);
 
             libusb_fill_bulk_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
-                                      _frameBuffer + LGX_DATA_FRAME_LEN * i, LGX_DATA_FRAME_LEN,
+                                      _frameBuffer + i * LGX_DATA_FRAME_LEN, LGX_DATA_FRAME_LEN,
                                       usbTransferComplete, this, 0);
 
             _transfers.push_back(transfer);
+            libusb_submit_transfer(transfer);
         }
-
-        for (int i = 1; i < 4; i++) {
-            libusb_submit_transfer(_transfers[i]);
-        }
-        libusb_submit_transfer(_transfers[0]);
     }
 }

@@ -1,6 +1,8 @@
 
 #include <iostream>
 #include <csignal>
+#include <cstdio>
+#include <stdexcept>
 #include <liblgx.h>
 #include "OptionParser.h"
 #include "../version.h"
@@ -56,15 +58,17 @@ int main(int argc, char **argv) {
 
     SDL_Event event;
 
-    while (!do_exit) {
-
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                do_exit = true;
+    try {
+        while (!do_exit) {
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_EVENT_QUIT) {
+                    do_exit = true;
+                }
             }
+            device.run();
         }
-
-        device.run();
+    } catch (const std::exception &e) {
+        fprintf(stderr, "Fatal: %s\n", e.what());
     }
 
     device.shutdown();

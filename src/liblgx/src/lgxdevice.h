@@ -4,6 +4,7 @@
 #include <functional>
 #include <cstdint>
 #include <string>
+#include <chrono>
 #include "FrameBuilder.h"
 
 namespace lgx2 {
@@ -101,9 +102,20 @@ namespace lgx2 {
 
         std::function<void(uint8_t *)> _onFrameData;
 
+        // Full 1080p YUY2 frame = 1,036,800 uint32s. C1FFFF00 is a sub-frame chunk
+        // delimiter (~16 chunks per frame); only produce once enough has accumulated.
+        static constexpr uint32_t MINIMUM_VIDEO_FRAME_SIZE = 1000000;
+
+        int _inAudio{0};
+
+        uint64_t _videoFrameCount{0};
+        uint32_t _maxVideoFrameSize{0};
+        uint32_t _minVideoFrameSize{UINT32_MAX};
+        std::chrono::steady_clock::time_point _fpsTimestamp{};
+
         void onFrameData(uint8_t *data);
 
-        void produceVideoData(uint8_t *data);
+        void produceVideoData(uint32_t frameSize, uint8_t *data);
 
         void produceAudioData(uint8_t *data);
     };

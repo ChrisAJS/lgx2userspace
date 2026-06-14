@@ -17,7 +17,8 @@ namespace utils {
 
         const static uint32_t VIDEO_FRAME_START_MARKER = 0xC0FFFF00;
         const static uint32_t VIDEO_FRAME_END_MARKER   = 0xC1FFFF00;
-        const static uint32_t AUDIO_FRAME_START_MARKER = 0xAA5555AA;
+        const static uint32_t AUDIO_FRAME_START_MARKER = 0x58FFFF00;
+        const static uint32_t AUDIO_FRAME_END_MARKER   = 0xAA5555AA;
 
     private:
         uint32_t* _videoFrame;

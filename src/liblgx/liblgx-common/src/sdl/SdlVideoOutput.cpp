@@ -1,7 +1,9 @@
 #include "SdlVideoOutput.h"
 
 #include <SDL3/SDL.h>
+#include <cstdio>
 #include <stdexcept>
+#include <vector>
 
 namespace sdl {
 
@@ -42,34 +44,31 @@ namespace sdl {
 
 
     void SdlVideoOutput::videoFrameAvailable(uint32_t *image) {
-        uint32_t *pixels{nullptr};
-        int32_t pitch;
-        int result = SDL_LockTexture(_texture, nullptr, (void **) &pixels, &pitch);
-        if (pixels != nullptr && result == 0) {
-            int pitchInInts = pitch/4;
-
-            if (_targetScale == lgx2::VideoScale::Full) {
-                memcpy(pixels, image, 1920 * 1080 * 2);
-            } else if (_targetScale == lgx2::VideoScale::Half) {
-                for (int y = 0; y < 540; y++) {
-                    for (int x = 0; x < 960; x++) {
-                        int frameOffset = ((y * 960) + x) * 2;
-                        int textureOffset = ((y * pitchInInts) + x);
-                        pixels[textureOffset] = image[frameOffset];
-                    }
-                }
-            } else {
-                for (int y = 0; y < 1080; y += 4) {
-                    for (int x = 0; x < 1920; x += 4) {
-                        int frameOffset = y * 1920 + x;
-                        int textureOffset = (((y >> 2) * (pitch>>2)) + (x >> 2));
-                        pixels[textureOffset] = image[frameOffset];
-                    }
-                }
+        if (_targetScale == lgx2::VideoScale::Full) {
+            // YUY2: 2 bytes per pixel, pitch = width * 2
+            if (!SDL_UpdateTexture(_texture, nullptr, image, 1920 * 2)) {
+                fprintf(stderr, "SDL_UpdateTexture failed: %s\n", SDL_GetError());
             }
+            return;
         }
 
-        SDL_UnlockTexture(_texture);
+        // Scaled modes: downsample into a temporary buffer then upload.
+        // YUY2 macropixel = 1 uint32 covers 2 horizontal pixels, so
+        // half-width = 480 uint32s, quarter-width = 240 uint32s.
+        int texW = (_targetScale == lgx2::VideoScale::Half) ? 960  : 480;
+        int texH = (_targetScale == lgx2::VideoScale::Half) ? 540  : 270;
+        int step = (_targetScale == lgx2::VideoScale::Half) ? 2    : 4;
+
+        std::vector<uint32_t> buf(texW * texH);
+        for (int y = 0; y < texH; y++) {
+            for (int x = 0; x < texW; x++) {
+                // Sample one macropixel from the source at the scaled position
+                buf[y * texW + x] = image[(y * step) * 960 + x * step];
+            }
+        }
+        if (!SDL_UpdateTexture(_texture, nullptr, buf.data(), texW * 2)) {
+            fprintf(stderr, "SDL_UpdateTexture failed: %s\n", SDL_GetError());
+        }
     }
 
     void SdlVideoOutput::display() {
