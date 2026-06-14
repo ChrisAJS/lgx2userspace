@@ -14,25 +14,29 @@ The following steps describe cross-compiling from Linux for Windows.
 If you have a C++ IDE that understands CMake files (e.g. CLion), then it should be as simple as importing the project
 and building the lgx2userspace target.
 
-If you are building from Linux however...
+### Cross-compiling from Linux
 
-The Windows variant can be built once you have installed MingW32 on your machine and also Conan (via `pip install conan`).
-
-Then, if you are lucky the following commands should _just work_.
+You will need the MinGW toolchain and the MinGW-packaged versions of the dependencies. On Fedora:
 
 ```bash
-mkdir winbuild
-cd winbuild
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=../TC-Mingw.cmake ..
-# Maybe invoke cmake 2-3 times
-make
+sudo dnf install mingw64-gcc-c++ mingw64-SDL2-devel mingw64-libusb1-devel
 ```
 
-If you get errors the first time, try invoking cmake again. The CMakeLists are written by a complete newcomer so there
-appears to be some issues when starting fresh.
+On Debian/Ubuntu:
 
-The build process does involve downloading libusb and SDL2 from Conan compatible repositories and also compilation of
-libusb and SDL2, so it can take a few minutes depending on your machine.
+```bash
+sudo apt install gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
+# SDL2 and libusb may need to be built from source or sourced from another package repo
+```
+
+With the toolchain and dependencies installed, build with:
+
+```bash
+mkdir winbuild && cd winbuild
+PKG_CONFIG_LIBDIR=/usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig \
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=../TC-Mingw.cmake ..
+make
+```
 
 Once the build is complete, the lgx2userspace.exe file can be used.
 
@@ -66,24 +70,26 @@ You are now ready to use the lgx2userspace driver.
 
 ## Building on a Windows machine
 ### Prerequisites
-The project uses CMake, Conan and a C++ toolchain to build the `lgx2userspace.exe` binary.
+The project uses CMake and a C++ toolchain to build the `lgx2userspace.exe` binary. Dependencies are managed via [MSYS2](https://www.msys2.org/).
 
-As Conan is a python project, you will need to install python, which can be downloaded from [Python Releases for Windows](https://www.python.org/downloads/windows).
-
-CMake can be downloaded from the [CMake Github Releases page](https://github.com/Kitware/CMake/releases).
-
-You will need gcc and g++ in order to build the project, which can be installed as part of the [msys2 toolset](https://www.msys2.org/).
-
-### Building
-With CMake and Conan installed, building _should_ be as simple as cloning the project and navigating to it using cmd.exe:
+Install MSYS2, then open an MSYS2 MinGW64 shell and install the required packages:
 
 ```bash
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Debug ..
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
+          mingw-w64-x86_64-SDL2 mingw-w64-x86_64-libusb \
+          mingw-w64-x86_64-pkg-config
 ```
 
-**NOTE: This will download and build all the dependencies and will take a while depending on your machine.**
+CMake can also be downloaded separately from the [CMake Github Releases page](https://github.com/Kitware/CMake/releases) if preferred.
+
+### Building
+From an MSYS2 MinGW64 shell, clone the project and build:
+
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . --parallel
+```
 
 
 

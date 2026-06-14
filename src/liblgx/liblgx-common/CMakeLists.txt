@@ -1,11 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL2    REQUIRED IMPORTED_TARGET sdl2)
-pkg_check_modules(LIBUSB  REQUIRED IMPORTED_TARGET libusb-1.0)
-pkg_check_modules(GLFW3   REQUIRED IMPORTED_TARGET glfw3)
-pkg_check_modules(GLEW    REQUIRED IMPORTED_TARGET glew)
-find_package(OpenGL REQUIRED)
+pkg_check_modules(SDL2   REQUIRED IMPORTED_TARGET sdl2)
+pkg_check_modules(LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
 
 set(BOOTSTRAP_SOURCES
         src/bootstrap/commanddata_lgx.cpp
@@ -18,10 +15,6 @@ set(SDLOUTPUT_SOURCES
         src/sdl/SdlVideoOutput.h
         src/sdl/SdlAudioOutput.cpp
         src/sdl/SdlAudioOutput.h)
-
-set(GLFWOUTPUT_SOURCES
-        src/glfw/GlfwVideoOutput.cpp
-        src/glfw/GlfwVideoOutput.h)
 
 set(NULL_SOURCES
         src/NullVideoOutput.cpp
@@ -43,7 +36,6 @@ set(ERRORSINK_SOURCES
 
 add_library(liblgx-common STATIC
         ${SDLOUTPUT_SOURCES}
-        ${GLFWOUTPUT_SOURCES}
         ${NULL_SOURCES}
         ${USB_SOURCES}
         ${BOOTSTRAP_SOURCES}
@@ -56,10 +48,7 @@ target_include_directories(liblgx-common PRIVATE ../src)
 
 target_link_libraries(liblgx-common PUBLIC
         PkgConfig::SDL2
-        PkgConfig::LIBUSB
-        PkgConfig::GLFW3
-        PkgConfig::GLEW
-        OpenGL::GL)
+        PkgConfig::LIBUSB)
 
 if(ENABLE_LGX_GC550_SUPPORT)
     target_compile_definitions(liblgx-common PUBLIC GC550_SUPPORT)

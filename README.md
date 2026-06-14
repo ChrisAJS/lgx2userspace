@@ -158,4 +158,3 @@ This project uses the hard work of the following projects:
  * [SDL](https://www.libsdl.org/)
  * [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/)
  * [Catch2](https://github.com/catchorg/Catch2)
- * [GLFW](https://www.glfw.org/)
