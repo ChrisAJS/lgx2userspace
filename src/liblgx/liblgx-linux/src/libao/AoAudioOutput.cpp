@@ -12,7 +12,7 @@ namespace ao {
                 .rate = 48000,
                 .channels = 2,
                 .byte_format = AO_FMT_LITTLE,
-                .matrix = "L,R"
+                .matrix = const_cast<char*>("L,R")
         };
 
         _device = ao_open_live(0, &format, nullptr);

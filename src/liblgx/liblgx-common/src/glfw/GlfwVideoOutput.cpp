@@ -48,7 +48,7 @@ namespace glfw {
 
         glfwMakeContextCurrent(window);
 
-        gladLoadGL();
+        glewInit();
 
         glfwSetKeyCallback(window, [](GLFWwindow *window, int key, int, int, int) {
             if (key == GLFW_KEY_ESCAPE) {
@@ -165,13 +165,6 @@ namespace glfw {
 
     void GlfwVideoOutput::populateYuvImageFromFrame(uint32_t *image) {
         auto *rawImage = reinterpret_cast<uint8_t *>(image);
-
-        int step = 1;
-        if (targetScale == lgx2::VideoScale::Half) {
-            step = 2;
-        } else if (targetScale == lgx2::VideoScale::Quarter) {
-            step = 4;
-        }
 
         if (targetScale == lgx2::VideoScale::Full) {
             for (int i = 0; i < 1920 * 1080; i += 2) {

@@ -2,7 +2,7 @@
 #define LGX2USERSPACE_GLFWVIDEOOUTPUT_H
 
 #include "lgxdevice.h"
-#include <glad/glad.h>
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 namespace glfw {

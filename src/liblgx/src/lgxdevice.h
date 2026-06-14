@@ -1,7 +1,6 @@
 #ifndef LGX2USERSPACE_LGXDEVICE_H
 #define LGX2USERSPACE_LGXDEVICE_H
 
-#include "config.h"
 #include <functional>
 #include <cstdint>
 #include <string>

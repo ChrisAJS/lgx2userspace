@@ -6,5 +6,3 @@ add_library(liblgx-macos STATIC src/lgxplatform.h src/MacOsErrorSink.cpp src/Mac
 
 target_include_directories(liblgx-macos PUBLIC src)
 target_include_directories(liblgx-macos PRIVATE ../src)
-
-add_dependencies(liblgx-macos liblgx)

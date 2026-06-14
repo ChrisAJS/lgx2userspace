@@ -6,5 +6,3 @@ add_library(liblgx-windows STATIC src/lgxplatform.h src/WindowsErrorSink.cpp src
 
 target_include_directories(liblgx-windows PUBLIC src)
 target_include_directories(liblgx-windows PRIVATE ../src)
-
-add_dependencies(liblgx-windows liblgx)

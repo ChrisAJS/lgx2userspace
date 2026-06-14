@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 
-enable_testing()
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PULSE REQUIRED IMPORTED_TARGET libpulse-simple)
+find_library(AO_LIB ao REQUIRED)
 
 set(V4LOUTPUT_SOURCES
         src/v4l/V4LFrameOutput.cpp
@@ -20,14 +22,8 @@ add_library(liblgx-linux STATIC
         ${LIBAO_SOURCES})
 
 target_include_directories(liblgx-linux PUBLIC src)
-
 target_include_directories(liblgx-linux PRIVATE ../src)
 
-# Although SDL is a 'common' dependency', each platform can resolve it
-# in a different way. This will hopefully be pulled up into common once
-# the performance difference between prebuilt linux libs and conan built
-# libraries are understood
-target_link_libraries(liblgx-linux PUBLIC SDL2 pulse-simple ao)
-
-add_dependencies(liblgx-linux liblgx)
-
+target_link_libraries(liblgx-linux PUBLIC
+        PkgConfig::PULSE
+        ${AO_LIB})

@@ -11,7 +11,7 @@ v4l::V4LFrameOutput::V4LFrameOutput(const std::string &deviceName) {
     _v4l2fd = open(deviceName.c_str(), O_RDWR);
 }
 
-void v4l::V4LFrameOutput::initialiseVideo(lgx2::VideoScale scale) {
+void v4l::V4LFrameOutput::initialiseVideo(lgx2::VideoScale) {
     _frameBuffer = new uint8_t[1920 * 1080 * 2];
     if (_v4l2fd == -1) {
         throw std::runtime_error("Failed to open V4L2 Loopback device");
