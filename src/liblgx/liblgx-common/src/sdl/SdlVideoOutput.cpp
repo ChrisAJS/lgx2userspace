@@ -1,12 +1,12 @@
 #include "SdlVideoOutput.h"
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <stdexcept>
 
 namespace sdl {
 
     SdlVideoOutput::SdlVideoOutput() {
-        if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        if (!SDL_Init(SDL_INIT_VIDEO)) {
             throw std::runtime_error(SDL_GetError());
         }
     }
@@ -24,12 +24,9 @@ namespace sdl {
             height = 1080 / 4;
         }
 
-        _window = SDL_CreateWindow("lgx2userspace - sdl",
-                                   SDL_WINDOWPOS_UNDEFINED,
-                                   SDL_WINDOWPOS_UNDEFINED,
-                                   width, height,
-                                   SDL_WINDOW_RESIZABLE);
-        _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+        _window = SDL_CreateWindow("lgx2userspace", width, height, SDL_WINDOW_RESIZABLE);
+        _renderer = SDL_CreateRenderer(_window, nullptr);
+        SDL_SetRenderVSync(_renderer, 1);
 
         SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
         SDL_RenderClear(_renderer);
@@ -76,15 +73,15 @@ namespace sdl {
     }
 
     void SdlVideoOutput::display() {
-        const Uint8 *keyboardState = SDL_GetKeyboardState(nullptr);
+        const bool *keyboardState = SDL_GetKeyboardState(nullptr);
 
         if (keyboardState[SDL_SCANCODE_F]) {
-            SDL_SetWindowFullscreen(_window, 1);
+            SDL_SetWindowFullscreen(_window, true);
         } else if (keyboardState[SDL_SCANCODE_G]) {
-            SDL_SetWindowFullscreen(_window, 0);
+            SDL_SetWindowFullscreen(_window, false);
         }
 
-        SDL_RenderCopy(_renderer, _texture, nullptr, nullptr);
+        SDL_RenderTexture(_renderer, _texture, nullptr, nullptr);
         SDL_RenderPresent(_renderer);
     }
 

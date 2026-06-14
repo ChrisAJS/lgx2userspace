@@ -19,14 +19,14 @@ and building the lgx2userspace target.
 You will need the MinGW toolchain and the MinGW-packaged versions of the dependencies. On Fedora:
 
 ```bash
-sudo dnf install mingw64-gcc-c++ mingw64-SDL2-devel mingw64-libusb1-devel
+sudo dnf install mingw64-gcc-c++ mingw64-SDL3-devel mingw64-libusb1-devel
 ```
 
 On Debian/Ubuntu:
 
 ```bash
 sudo apt install gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
-# SDL2 and libusb may need to be built from source or sourced from another package repo
+# SDL3 and libusb may need to be built from source or sourced from another package repo
 ```
 
 With the toolchain and dependencies installed, build with:
@@ -76,7 +76,7 @@ Install MSYS2, then open an MSYS2 MinGW64 shell and install the required package
 
 ```bash
 pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
-          mingw-w64-x86_64-SDL2 mingw-w64-x86_64-libusb \
+          mingw-w64-x86_64-SDL3 mingw-w64-x86_64-libusb \
           mingw-w64-x86_64-pkg-config
 ```
 

@@ -4,33 +4,33 @@
 namespace sdl {
 
     SdlAudioOutput::SdlAudioOutput() {
-        if (SDL_Init(SDL_INIT_AUDIO) != 0) {
+        if (!SDL_Init(SDL_INIT_AUDIO)) {
             throw std::runtime_error(SDL_GetError());
         }
     }
 
     void SdlAudioOutput::initialiseAudio() {
-        SDL_AudioSpec want, have;
-        SDL_zero(want);
-        want.freq = 48000;
-        want.format = AUDIO_S16LSB;
-        want.channels = 2;
-        want.samples = 1024;
-        want.callback = nullptr;
-        _audio = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
-        SDL_PauseAudioDevice(_audio, 0);
+        SDL_AudioSpec spec{};
+        spec.freq     = 48000;
+        spec.format   = SDL_AUDIO_S16LE;
+        spec.channels = 2;
+
+        _stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
+        if (!_stream) {
+            throw std::runtime_error(SDL_GetError());
+        }
+        SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(_stream));
     }
 
     void SdlAudioOutput::audioFrameAvailable(uint32_t *audio) {
-        SDL_QueueAudio(_audio, audio, 800 * 4);
+        SDL_PutAudioStreamData(_stream, audio, 800 * 4);
     }
 
     void SdlAudioOutput::render() {
-        // Should be where audio data is written to the audio pipe
     }
 
     void SdlAudioOutput::shutdownAudio() {
-        SDL_PauseAudioDevice(_audio, 1);
-        SDL_CloseAudioDevice(_audio);
+        SDL_PauseAudioDevice(SDL_GetAudioStreamDevice(_stream));
+        SDL_DestroyAudioStream(_stream);
     }
 }

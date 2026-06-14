@@ -29,14 +29,10 @@ lgx2::VideoScale app::OptionParser::scale() {
 bool app::OptionParser::process(int argc, char **argv) {
     for(;;)
     {
-        switch(getopt(argc, argv, "vVa:d:hxsgfS:"))
+        switch(getopt(argc, argv, "vVd:hxsgfS:"))
         {
 #ifndef __MINGW32__
 #ifndef __APPLE__
-            case 'a':
-                std::cout << "Attempting to output to Pulseaudio sink: " << optarg << std::endl;
-                _audioOutput = new pulse::PulseAudioOutput(optarg);
-                continue;
             case 'd':
                 std::cout << "Attempting to output to V4L2Loopback device: " << optarg << std::endl;
                 _videoOutput = new v4l::V4LFrameOutput(optarg);
@@ -84,8 +80,7 @@ bool app::OptionParser::process(int argc, char **argv) {
                     "\t-V\tPrint diagnostic information during execution\n"
 #ifndef __MINGW32__
 #ifndef __APPLE__
-                    "\t-d V4L2LoopbackDevice\tSpecify the V4L2Loopback device to output video to (e.g. /dev/video99)\n\n"
-                    "\t-a Pulseaudio sink\tOutput audio to a Pulseaudio sink (useful when outputting video to V4L2Loopback)\n"
+                    "\t-d V4L2LoopbackDevice\tSpecify the V4L2Loopback device to output video to (e.g. /dev/video99)\n"
 #endif
 #endif
 #ifdef GC550_SUPPORT

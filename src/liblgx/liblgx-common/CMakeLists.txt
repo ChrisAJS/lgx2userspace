@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL2   REQUIRED IMPORTED_TARGET sdl2)
+pkg_check_modules(SDL3   REQUIRED IMPORTED_TARGET sdl3)
 pkg_check_modules(LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
 
 set(BOOTSTRAP_SOURCES
@@ -47,7 +47,7 @@ target_include_directories(liblgx-common PUBLIC src)
 target_include_directories(liblgx-common PRIVATE ../src)
 
 target_link_libraries(liblgx-common PUBLIC
-        PkgConfig::SDL2
+        PkgConfig::SDL3
         PkgConfig::LIBUSB)
 
 if(ENABLE_LGX_GC550_SUPPORT)

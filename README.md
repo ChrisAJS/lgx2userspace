@@ -26,22 +26,28 @@ To enable LGX (GC550) support, add `-DENABLE_LGX_GC550_SUPPORT=ON` to the `cmake
 ## Building
 To build the project, you will need:
 * CMake
-* Libusb
-* Libpcap
-* SDL2
+* libusb
+* SDL3
 * V4L2Loopback
 
-### Ubuntu 22.04
+### Ubuntu 24.04+
 The following packages need to be installed:
 
 ```bash
-sudo apt install cmake libusb-dev libsdl2-dev libsdl2-gfx-dev libpulse-dev v4l2loopback-dkms v4l2loopback-utils
+sudo apt install cmake libusb-1.0-0-dev libsdl3-dev v4l2loopback-dkms v4l2loopback-utils
 ```
-### Arch Linux (Unconfirmed)
+### Arch Linux
 The following packages need to be installed:
 
 ```bash
-sudo pacman -S cmake libusb sdl2 sdl2_gfx libpulse v4l2loopback-dkms v4l2loopback-utils
+sudo pacman -S cmake libusb sdl3 v4l2loopback-dkms v4l2loopback-utils
+```
+
+### Fedora
+The following packages need to be installed:
+
+```bash
+sudo dnf install cmake libusb1-devel SDL3-devel v4l2loopback
 ```
 
 ### Build Command
@@ -89,7 +95,7 @@ which will likely be that you haven't installed the udev rules required to give 
 LGX2 without root access.
 
 ### Options when running
-When using the default SDL2 renderer for video output, it is possible to toggle fullscreen
+When using the default SDL renderer for video output, it is possible to toggle fullscreen
 by pressing `F` and to exit fullscreen by pressing `G`.
 
 ### Gathering diagnostic information
@@ -103,7 +109,7 @@ process frame data and time taken to render both audio and video.
 This information could be valuable when identifying issues so please try your best to include it
 in any issues you raise, thank you!
 
-## Running with V4L2 Output and Pulseaudio Output
+## Running with V4L2 Output
 ### V4L2 Output setup
 To output video to a virtual webcam output source, load the V4L2 Loopback Linux module with an easy to identify device
 number:
@@ -119,28 +125,11 @@ ls /dev/video99
 /dev/video99
 ```
 
-### Pulseaudio Setup
-Pulseaudio can be configured by issuing the following commands:
-```bash
-pactl load-module module-null-sink sink_name=lgx2 sink_properties=device.description=LGX2
-pactl load-module module-remap-source master=lgx2.monitor source_name=lgx2 source_properties=device.description=LGX2Audio
-```
-This will create an audio sink called `LGX2 Audio Sink` which can be added to OBS as a Pulseaudio output capture device.
-
-**NOTE: Even if you are using the LGX GC550- leaving the names as lgx2 is required and will not affect behaviour.**
-**NOTE: The best way to control the audio volume is to use the gain OBS filter whilst leaving the sink volume at max.**
-
-### Running with configure V4L2 device
+### Running with a V4L2 device
 Run the userspace driver with the `-d` option to specify which V4L2Loopback device to use:
 
 ```bash
 ./lgx2userspace -d /dev/video99
-```
-
-To run using the Pulseaudio sink that you created, use the `-a` switch with the name of the sink:
-
-```bash
-./lgx2userspace -a lgx2
 ```
 
 **NOTE: You may need to unplug and replug in your video source.**
@@ -155,6 +144,5 @@ This project uses the hard work of the following projects:
 
  * [libusb](https://libusb.info/)
  * [V4L2Loopback](https://github.com/umlaeute/v4l2loopback)
- * [SDL](https://www.libsdl.org/)
- * [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/)
+ * [SDL3](https://www.libsdl.org/)
  * [Catch2](https://github.com/catchorg/Catch2)

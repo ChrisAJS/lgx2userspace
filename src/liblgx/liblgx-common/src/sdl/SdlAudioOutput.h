@@ -2,7 +2,7 @@
 #define LGX2USERSPACE_SDLAUDIOOUTPUT_H
 
 #include "lgxdevice.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 namespace sdl {
     class SdlAudioOutput : public lgx2::AudioOutput {
@@ -17,7 +17,7 @@ namespace sdl {
 
         void shutdownAudio() override;
     private:
-        SDL_AudioDeviceID _audio{};
+        SDL_AudioStream *_stream{nullptr};
     };
 }
 
