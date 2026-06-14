@@ -9,6 +9,10 @@ add_compile_options(-Wall -Wextra)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 OPTION(ENABLE_LGX_GC550_SUPPORT "Enables LGX (GC550) support which will prevent further use of the LGX with the official Windows driver" OFF)
+OPTION(LGX2_VERBOSE_STATS "Print per-second frame rate and frame size statistics to stdout" OFF)
+if (LGX2_VERBOSE_STATS)
+    add_compile_definitions(LGX2_VERBOSE_STATS)
+endif()
 
 if (ENABLE_LGX_GC550_SUPPORT)
     message("You have opted to build in LGX (GC550) support into the userspace driver.")

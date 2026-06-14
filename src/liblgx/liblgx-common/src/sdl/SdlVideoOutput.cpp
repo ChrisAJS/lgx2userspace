@@ -28,7 +28,8 @@ namespace sdl {
 
         _window = SDL_CreateWindow("lgx2userspace", width, height, SDL_WINDOW_RESIZABLE);
         _renderer = SDL_CreateRenderer(_window, nullptr);
-        SDL_SetRenderVSync(_renderer, 1);
+        // No vsync: the compositor would throttle SDL_RenderPresent for occluded windows,
+        // starving the USB dequeue loop. The USB transfer rate (~60fps) provides natural pacing.
 
         SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
         SDL_RenderClear(_renderer);

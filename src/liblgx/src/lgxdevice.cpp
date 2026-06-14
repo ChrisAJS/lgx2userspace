@@ -67,11 +67,9 @@ namespace lgx2 {
             }
         }
 
-        // The USB stream is raw video data with three types of delimiter:
-        //   VIDEO_FRAME_END_MARKER (0xC1FFFF00) - produce the accumulated frame
-        //   VIDEO_FRAME_START_MARKER (0xC0FFFF00) - protocol sync, treat as raw video data
-        //   AUDIO_FRAME_START_MARKER (0x58FFFF00) - audio region follows
-        // Everything that is not a delimiter is accumulated as video.
+        // Sub-chunk structure (confirmed by hex dump):
+        //   [C0FFFF00][C3xxxxxx metadata][transition word][video data...][C1FFFF00]  (~16x/frame)
+        //   Audio packets [58FFFF00][pad][data...][AA5555AA] appear between video sub-chunks.
         while (i < count) {
             if (d[i] == utils::FrameBuilder::VIDEO_FRAME_END_MARKER) {
                 uint32_t frameSize = _frameBuilder.videoFrameSize();
@@ -80,6 +78,14 @@ namespace lgx2 {
                     produceVideoData(frameSize, reinterpret_cast<uint8_t *>(frame));
                 }
                 // If below threshold, keep accumulating — this is a sub-frame chunk boundary.
+                i++;
+            } else if (d[i] == utils::FrameBuilder::VIDEO_FRAME_START_MARKER) {
+                // Sub-chunk header is 4 words: [C0FFFF00][metadata][word2][word3].
+                // Real video starts at the 5th word.
+                i += 4;
+            } else if (d[i] == utils::FrameBuilder::AUDIO_FRAME_END_MARKER) {
+                // Stray end marker — audio that started in a previous transfer was already
+                // drained at the top of this function, so this is trailing protocol data.
                 i++;
             } else if (d[i] == utils::FrameBuilder::AUDIO_FRAME_START_MARKER) {
                 i += 2;  // skip marker + 1 padding word
@@ -93,11 +99,12 @@ namespace lgx2 {
                     _inAudio = 1;
                 }
             } else {
-                // Accumulate as video (includes VIDEO_FRAME_START_MARKER which is a protocol sync)
                 uint32_t start = i;
                 while (i < count
                        && d[i] != utils::FrameBuilder::VIDEO_FRAME_END_MARKER
-                       && d[i] != utils::FrameBuilder::AUDIO_FRAME_START_MARKER) {
+                       && d[i] != utils::FrameBuilder::VIDEO_FRAME_START_MARKER
+                       && d[i] != utils::FrameBuilder::AUDIO_FRAME_START_MARKER
+                       && d[i] != utils::FrameBuilder::AUDIO_FRAME_END_MARKER) {
                     i++;
                 }
                 _frameBuilder.buildVideo(data + start * 4, i - start);
@@ -116,11 +123,13 @@ namespace lgx2 {
         if (_fpsTimestamp == std::chrono::steady_clock::time_point{}) {
             _fpsTimestamp = now;
         } else if (now - _fpsTimestamp >= std::chrono::seconds(1)) {
+#ifdef LGX2_VERBOSE_STATS
             auto elapsed = std::chrono::duration<double>(now - _fpsTimestamp).count();
             printf("Frames: %" PRIu64 " (%.0f fps)  frame size min/max: %u/%u uint32s\n",
                    _videoFrameCount,
                    static_cast<double>(_videoFrameCount) / elapsed,
                    _minVideoFrameSize, _maxVideoFrameSize);
+#endif
             _fpsTimestamp = now;
             _videoFrameCount = 0;
             _minVideoFrameSize = UINT32_MAX;

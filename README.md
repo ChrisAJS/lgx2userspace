@@ -56,9 +56,22 @@ With the dependencies installed for your environment it should be possible to bu
 Execute the following commands to build in the root of the project:
 
 ```bash
-mkdir build && cd build
-cmake ..
-make
+cmake -S . -B build
+cmake --build build
+```
+
+### Build options
+
+| Option | Default | Description |
+|---|---|---|
+| `ENABLE_LGX_GC550_SUPPORT` | `OFF` | Compile in support for the LGX (GC550). **Warning:** using this driver with a GC550 will prevent the official Windows driver from working on that device. See the LGX (GC550) Issues section. |
+| `LGX2_VERBOSE_STATS` | `OFF` | Print per-second frame rate and frame size statistics to stdout. Useful for diagnosing capture performance issues. |
+
+Pass options to cmake with `-D`, for example:
+
+```bash
+cmake -S . -B build -DLGX2_VERBOSE_STATS=ON
+cmake --build build
 ```
 
 ## Setup
@@ -138,6 +151,12 @@ Go to OBS or other streaming software and select the LGX2 V4L2 source. You shoul
 
 ## Demo
 See it in action over at [YouTube](https://www.youtube.com/watch?v=-yzHMbUn-w0).
+
+## Protocol documentation
+What is known (and unknown) about the USB bulk-transfer protocol the device uses
+to stream video and audio is documented in [PROTOCOL.md](PROTOCOL.md). This
+covers marker values, sub-chunk structure, frame assembly, audio packet layout,
+and known video source compatibility issues (MacBook colorspace, camera HDMI).
 
 # Attributions
 This project uses the hard work of the following projects:

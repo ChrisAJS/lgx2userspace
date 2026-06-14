@@ -23,6 +23,7 @@ namespace sdl {
     }
 
     void SdlAudioOutput::audioFrameAvailable(uint32_t *audio) {
+        SDL_PutAudioStreamData(_stream, audio, 800 * 4);
     }
 
     void SdlAudioOutput::render() {

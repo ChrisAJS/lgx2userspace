@@ -18,7 +18,9 @@ static void probeTransferComplete(struct libusb_transfer *transfer) {
 
     if (transfer->status == LIBUSB_TRANSFER_COMPLETED &&
         memcmp(transfer->buffer, frameStart, 4) == 0) {
+#ifdef LGX2_VERBOSE_STATS
         printf("Found initial frame!\n");
+#endif
         // Enqueue probe data as the first chunk — it starts at the frame boundary,
         // so discarding it would cause the first produced frame to be a splice of two frames.
         stream->onFrameData(transfer);
@@ -241,13 +243,6 @@ namespace libusb {
 
     void UsbStream::submitTransfer(libusb_transfer *transfer) {
         if (!_shuttingDown) {
-            static constexpr auto kInterval = std::chrono::nanoseconds(1'000'000'000 / 60);
-            auto now = std::chrono::steady_clock::now();
-            auto remaining = kInterval - (now - _lastSubmitTime);
-            if (remaining > std::chrono::nanoseconds(0)) {
-                std::this_thread::sleep_for(remaining);
-            }
-            _lastSubmitTime = std::chrono::steady_clock::now();
             libusb_submit_transfer(transfer);
         } else {
             libusb_free_transfer(transfer);
@@ -270,15 +265,13 @@ namespace libusb {
     }
 
     void UsbStream::queueAllFrameReads() {
-        for (int i = 0; i < 2; i++) {
-            libusb_transfer *transfer = libusb_alloc_transfer(0);
+        libusb_transfer *transfer = libusb_alloc_transfer(0);
 
-            libusb_fill_bulk_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
-                                      _frameBuffer + i * LGX_DATA_FRAME_LEN, LGX_DATA_FRAME_LEN,
-                                      usbTransferComplete, this, 0);
+        libusb_fill_bulk_transfer(transfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
+                                  _frameBuffer, LGX_DATA_FRAME_LEN,
+                                  usbTransferComplete, this, 0);
 
-            _transfers.push_back(transfer);
-            libusb_submit_transfer(transfer);
-        }
+        _transfers.push_back(transfer);
+        libusb_submit_transfer(transfer);
     }
 }
