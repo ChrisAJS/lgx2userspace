@@ -11,7 +11,7 @@ namespace sdl {
 
         void initialiseAudio() override;
 
-        void audioFrameAvailable(uint32_t *audio) override;
+        void audioFrameAvailable(const uint8_t *audio, uint32_t byteLength) override;
 
         void render() override;
 

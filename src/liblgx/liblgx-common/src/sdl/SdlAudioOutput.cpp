@@ -22,8 +22,8 @@ namespace sdl {
         SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(_stream));
     }
 
-    void SdlAudioOutput::audioFrameAvailable(uint32_t *audio) {
-        SDL_PutAudioStreamData(_stream, audio, 800 * 4);
+    void SdlAudioOutput::audioFrameAvailable(const uint8_t *audio, uint32_t byteLength) {
+        SDL_PutAudioStreamData(_stream, audio, byteLength);
     }
 
     void SdlAudioOutput::render() {

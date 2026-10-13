@@ -38,11 +38,19 @@ namespace lgx2 {
 
         virtual void streamSetupCommands(DeviceType deviceType) = 0;
 
-        virtual void queueFrameRead(std::function<void(uint8_t *frameData)> *onData) = 0;
+        // Callback receives each USB chunk as (data, length, gapped). gapped=true means
+        // bytes were lost before this chunk (dropped queue slot, failed or short transfer),
+        // so the parser must re-sync before trusting it again.
+        virtual void queueFrameRead(std::function<void(uint8_t *frameData, uint32_t length, bool gapped)> *onData) = 0;
 
         virtual void update() = 0;
 
         virtual void shutdownStream() = 0;
+
+        // Diagnostics (cumulative since stream start). Default 0 for streams that do not track them.
+        virtual uint64_t droppedChunks() const { return 0; }
+
+        virtual uint64_t transferErrors() const { return 0; }
     };
 
     enum class VideoScale {
@@ -70,7 +78,8 @@ namespace lgx2 {
     public:
         virtual void initialiseAudio() = 0;
 
-        virtual void audioFrameAvailable(uint32_t *audio) = 0;
+        // Audio packets are length-declared on the wire, so byteLength varies per packet.
+        virtual void audioFrameAvailable(const uint8_t *audio, uint32_t byteLength) = 0;
 
         virtual void render() = 0;
 
@@ -100,24 +109,16 @@ namespace lgx2 {
 
         utils::FrameBuilder _frameBuilder;
 
-        std::function<void(uint8_t *)> _onFrameData;
-
-        // Full 1080p YUY2 frame = 1,036,800 uint32s. C1FFFF00 is a sub-frame chunk
-        // delimiter (~16 chunks per frame); only produce once enough has accumulated.
-        static constexpr uint32_t MINIMUM_VIDEO_FRAME_SIZE = 1000000;
-
-        int _inAudio{0};
+        std::function<void(uint8_t *, uint32_t, bool)> _onFrameData;
 
         uint64_t _videoFrameCount{0};
-        uint32_t _maxVideoFrameSize{0};
-        uint32_t _minVideoFrameSize{UINT32_MAX};
         std::chrono::steady_clock::time_point _fpsTimestamp{};
 
-        void onFrameData(uint8_t *data);
+        void onFrameData(uint8_t *data, uint32_t length, bool gapped);
 
-        void produceVideoData(uint32_t frameSize, uint8_t *data);
+        void produceVideoData(uint32_t frameSize, const uint8_t *data);
 
-        void produceAudioData(uint8_t *data);
+        void produceAudioData(const uint8_t *data, uint32_t byteLength);
     };
 
 }

@@ -2,11 +2,11 @@
 #define LGX2USERSPACE_USBSTREAM_H
 
 #include <vector>
-#include <queue>
 #include <thread>
 #include <mutex>
 #include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <libusb-1.0/libusb.h>
 #include "lgxdevice.h"
 
@@ -19,22 +19,32 @@ namespace libusb {
 
         bool deviceAvailable(lgx2::DeviceType deviceType) override;
         void streamSetupCommands(lgx2::DeviceType deviceType) override;
-        void queueFrameRead(std::function<void(uint8_t *)> *onData) override;
+        void queueFrameRead(std::function<void(uint8_t *, uint32_t, bool)> *onData) override;
         void update() override;
-
-        void onFrameData(libusb_transfer *transfer);
 
         void shutdownStream() override;
 
-        void submitTransfer(libusb_transfer *transfer);
-        void discardTransfer(libusb_transfer *transfer);
-        void signalError(const char *message);
-        bool recordProbeAttempt();
-
-        void queueAllFrameReads();
+        // Diagnostics: chunks dropped because the bounded queue was full (consumer too slow),
+        // and transient transfer errors that were recovered from by marking a gap.
+        uint64_t droppedChunks() const override;
+        uint64_t transferErrors() const override;
 
     private:
-        static constexpr int MAX_QUEUE_DEPTH = 4;
+        // A pool of outstanding bulk IN URBs keeps the pipeline full regardless of
+        // consumer load: with all slots in flight the device NAKs (bulk back-pressure)
+        // instead of overflowing, so a stalled consumer loses nothing.
+        static constexpr int TRANSFER_POOL_SIZE = 4;
+
+        // Bounded queue between the read thread and the consumer. When full, the oldest
+        // chunk is dropped (live video wants the latest data) and the stream is flagged
+        // gapped so the parser re-syncs.
+        static constexpr int RING_SLOTS = 8;
+
+        struct RingSlot {
+            uint8_t *buffer;
+            uint32_t length{0};
+            bool gapped{false};
+        };
 
         libusb_device_handle *_dev;
 
@@ -43,22 +53,51 @@ namespace libusb {
 
         std::vector<lgx2::DeviceType> _availableDevices;
 
-        std::function<void(uint8_t *)> *_onFrameDataCallback;
+        std::function<void(uint8_t *, uint32_t, bool)> *_onFrameDataCallback;
 
+        // Transfer pool regions (TRANSFER_POOL_SIZE) followed by ring slot regions (RING_SLOTS).
         uint8_t *_frameBuffer;
+        RingSlot _ring[RING_SLOTS];
+        int _ringWrite{0};
+        int _ringCount{0};
+        bool _gapPending{false};
+
         std::atomic<bool> _shuttingDown{false};
         std::atomic<bool> _hasError{false};
         std::string _errorMessage;
 
+        // Cumulative diagnostics (updated by the read thread, read by the consumer).
+        std::atomic<uint64_t> _droppedChunks{0};
+        std::atomic<uint64_t> _transferErrors{0};
+
+        // Optional raw-chunk capture for offline analysis. Set LGX2_DUMP_FILE=/path/to.cab to
+        // record each chunk as [uint32 length][uint8 gapped][length bytes], up to DUMP_MAX_CHUNKS.
+        static constexpr uint64_t DUMP_MAX_CHUNKS = 128;
+        FILE *_dumpFile{nullptr};
+        uint64_t _dumpCount{0};
+
+        void dumpChunk(const uint8_t *data, uint32_t length, bool gapped);
+
         std::thread _readThread;
         std::mutex _queueMutex;
-        std::queue<std::vector<uint8_t>> _frameQueue;
-        std::chrono::steady_clock::time_point _lastSubmitTime{};
+        std::vector<uint8_t> _consumeBuffer;
 
         static constexpr int MAX_PROBE_ATTEMPTS = 8;
         int _probeAttempts{0};
 
         void readLoop();
+
+        void submitTransfer(libusb_transfer *transfer);
+        void discardTransfer(libusb_transfer *transfer);
+        void signalError(const char *message);
+        void markGap();
+        bool recordProbeAttempt();
+
+        void enqueueChunk(const uint8_t *data, uint32_t length, bool gapped);
+        void queueAllFrameReads();
+
+        static void probeTransferComplete(libusb_transfer *transfer);
+        static void usbTransferComplete(libusb_transfer *transfer);
     };
 }
 

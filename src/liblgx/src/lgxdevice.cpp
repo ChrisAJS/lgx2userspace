@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cinttypes>
-#include <climits>
 #include <cstdio>
 #include <stdexcept>
 
@@ -10,9 +9,16 @@ namespace lgx2 {
 
     Device::Device(Stream *stream, VideoOutput *videoOutput, AudioOutput *audioOutput, Logger *logger, ErrorSink *errorSink)
             : _stream{stream}, _videoOutput{videoOutput}, _audioOutput{audioOutput}, _logger{logger}, _errorSink{errorSink} {
-        _onFrameData = [&](uint8_t *frameData) {
-            onFrameData(frameData);
+        _onFrameData = [&](uint8_t *frameData, uint32_t length, bool gapped) {
+            onFrameData(frameData, length, gapped);
         };
+
+        _frameBuilder.setVideoFrameCallback([this](const uint8_t *data, uint32_t byteLength) {
+            produceVideoData(byteLength, data);
+        });
+        _frameBuilder.setAudioFrameCallback([this](const uint8_t *data, uint32_t byteLength) {
+            produceAudioData(data, byteLength);
+        });
     }
 
     bool Device::isDeviceAvailable(DeviceType device) {
@@ -48,98 +54,42 @@ namespace lgx2 {
         _logger->logTimeEnd("audioOutput", "Audio output render");
     }
 
-    void Device::onFrameData(uint8_t *data) {
-        const uint32_t count = 0x1FC000 / 4;
-        auto *d = reinterpret_cast<uint32_t *>(data);
-        uint32_t i = 0;
-
-        // Drain audio continuation from a previous transfer
-        if (_inAudio) {
-            uint32_t start = i;
-            while (i < count && d[i] != utils::FrameBuilder::AUDIO_FRAME_END_MARKER) i++;
-            _frameBuilder.buildAudio(data + start * 4, i - start);
-            if (i < count) {
-                _inAudio = 0;
-                produceAudioData(reinterpret_cast<uint8_t *>(_frameBuilder.completeAudioFrame()));
-                i++;
-            } else {
-                return;
-            }
-        }
-
-        // Sub-chunk structure (confirmed by hex dump):
-        //   [C0FFFF00][C3xxxxxx metadata][transition word][video data...][C1FFFF00]  (~16x/frame)
-        //   Audio packets [58FFFF00][pad][data...][AA5555AA] appear between video sub-chunks.
-        while (i < count) {
-            if (d[i] == utils::FrameBuilder::VIDEO_FRAME_END_MARKER) {
-                uint32_t frameSize = _frameBuilder.videoFrameSize();
-                if (frameSize >= MINIMUM_VIDEO_FRAME_SIZE) {
-                    auto *frame = _frameBuilder.completeVideoFrame();
-                    produceVideoData(frameSize, reinterpret_cast<uint8_t *>(frame));
-                }
-                // If below threshold, keep accumulating — this is a sub-frame chunk boundary.
-                i++;
-            } else if (d[i] == utils::FrameBuilder::VIDEO_FRAME_START_MARKER) {
-                // Sub-chunk header is 4 words: [C0FFFF00][metadata][word2][word3].
-                // Real video starts at the 5th word.
-                i += 4;
-            } else if (d[i] == utils::FrameBuilder::AUDIO_FRAME_END_MARKER) {
-                // Stray end marker — audio that started in a previous transfer was already
-                // drained at the top of this function, so this is trailing protocol data.
-                i++;
-            } else if (d[i] == utils::FrameBuilder::AUDIO_FRAME_START_MARKER) {
-                i += 2;  // skip marker + 1 padding word
-                uint32_t start = i;
-                while (i < count && d[i] != utils::FrameBuilder::AUDIO_FRAME_END_MARKER) i++;
-                _frameBuilder.buildAudio(data + start * 4, i - start);
-                if (i < count) {
-                    produceAudioData(reinterpret_cast<uint8_t *>(_frameBuilder.completeAudioFrame()));
-                    i++;
-                } else {
-                    _inAudio = 1;
-                }
-            } else {
-                uint32_t start = i;
-                while (i < count
-                       && d[i] != utils::FrameBuilder::VIDEO_FRAME_END_MARKER
-                       && d[i] != utils::FrameBuilder::VIDEO_FRAME_START_MARKER
-                       && d[i] != utils::FrameBuilder::AUDIO_FRAME_START_MARKER
-                       && d[i] != utils::FrameBuilder::AUDIO_FRAME_END_MARKER) {
-                    i++;
-                }
-                _frameBuilder.buildVideo(data + start * 4, i - start);
-            }
-        }
+    void Device::onFrameData(uint8_t *data, uint32_t length, bool gapped) {
+        // All marker detection, header validation and frame/audio assembly lives in the
+        // FrameBuilder state machine. A gap flags a lost region: it resets parser state
+        // and requires a clean SAV->EAV pair before frames are emitted again.
+        _frameBuilder.feed(data, length, gapped);
     }
 
-    void Device::produceVideoData(uint32_t frameSize, uint8_t *data) {
+    void Device::produceVideoData(uint32_t, const uint8_t *data) {
         _videoOutput->videoFrameAvailable((uint32_t *) data);
 
         auto now = std::chrono::steady_clock::now();
         _videoFrameCount++;
-        if (frameSize < _minVideoFrameSize) _minVideoFrameSize = frameSize;
-        if (frameSize > _maxVideoFrameSize) _maxVideoFrameSize = frameSize;
 
         if (_fpsTimestamp == std::chrono::steady_clock::time_point{}) {
             _fpsTimestamp = now;
         } else if (now - _fpsTimestamp >= std::chrono::seconds(1)) {
 #ifdef LGX2_VERBOSE_STATS
             auto elapsed = std::chrono::duration<double>(now - _fpsTimestamp).count();
-            printf("Frames: %" PRIu64 " (%.0f fps)  frame size min/max: %u/%u uint32s\n",
+            // Emitted frames are always exactly VIDEO_FRAME_BYTES, so size is not a useful signal.
+            // desync events (bad SAV/EAV checksum or b0/c0 mismatch), dropped chunks (consumer too
+            // slow) and recovered transfer errors are what indicate garbage or load problems.
+            printf("Frames: %" PRIu64 " (%.0f fps)  desync events: %u  dropped chunks: %" PRIu64
+                   "  transfer errors: %" PRIu64 "\n",
                    _videoFrameCount,
                    static_cast<double>(_videoFrameCount) / elapsed,
-                   _minVideoFrameSize, _maxVideoFrameSize);
+                   _frameBuilder.desyncCount(),
+                   _stream->droppedChunks(),
+                   _stream->transferErrors());
 #endif
             _fpsTimestamp = now;
             _videoFrameCount = 0;
-            _minVideoFrameSize = UINT32_MAX;
-            _maxVideoFrameSize = 0;
         }
     }
 
-    void Device::produceAudioData(uint8_t *data) {
-
-        _audioOutput->audioFrameAvailable((uint32_t *) data);
+    void Device::produceAudioData(const uint8_t *data, uint32_t byteLength) {
+        _audioOutput->audioFrameAvailable(data, byteLength);
     }
 
     void Device::shutdown() {

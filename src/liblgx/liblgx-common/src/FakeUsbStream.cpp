@@ -16,15 +16,16 @@ void FakeUsbStream::streamSetupCommands(lgx2::DeviceType) {
     // No-op
 }
 
-void FakeUsbStream::queueFrameRead(std::function<void(uint8_t *)> *onData) {
+void FakeUsbStream::queueFrameRead(std::function<void(uint8_t *, uint32_t, bool)> *onData) {
     _onFrameDataCallback = onData;
 }
 
 void FakeUsbStream::update() {
-    if (fread(frameData, 1, 0x1FC000, dump) != 0x1FC000) {
+    uint32_t bytesRead = fread(frameData, 1, 0x1FC000, dump);
+    if (bytesRead != 0x1FC000) {
         rewind(dump);
     }
-    (*_onFrameDataCallback)(frameData);
+    (*_onFrameDataCallback)(frameData, bytesRead, false);
 }
 
 void FakeUsbStream::shutdownStream() {

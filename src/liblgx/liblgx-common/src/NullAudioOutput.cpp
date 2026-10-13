@@ -2,7 +2,7 @@
 
 void NullAudioOutput::initialiseAudio() {}
 
-void NullAudioOutput::audioFrameAvailable(uint32_t *) {}
+void NullAudioOutput::audioFrameAvailable(const uint8_t *, uint32_t) {}
 
 void NullAudioOutput::render() {}
 
