@@ -31,6 +31,10 @@ namespace libusb {
         uint64_t droppedChunks() const override;
         uint64_t transferErrors() const override;
 
+        // From the HDMI status poll. True when the poll is disabled or has given up, so a broken
+        // poll never mutes audio permanently.
+        bool signalPresent() const override;
+
     private:
         // A pool of outstanding bulk IN URBs keeps the pipeline full regardless of
         // consumer load: with all slots in flight the device NAKs (bulk back-pressure)
@@ -96,10 +100,12 @@ namespace libusb {
         void runSetupCommands(const std::string &targetCommands);
 
         // Periodic read-only HDMI input status poll (GC551 only), modelled on the Windows
-        // driver's 200 ms CRXADV7604 poll thread. It issues I2C reads over the command
-        // endpoints (bulk OUT/IN 0x01) while the stream runs on IN 0x83, and logs changes in
-        // cable/signal/resolution. Set LGX2_NO_STATUS_POLL=1 to disable it.
-        static constexpr auto STATUS_POLL_INTERVAL = std::chrono::milliseconds(200);
+        // driver's poll threads. It issues I2C reads over the command endpoints (bulk OUT/IN
+        // 0x01) while the stream runs on IN 0x83, logs changes in cable/signal/resolution, and
+        // drives audio muting on signal loss. Set LGX2_NO_STATUS_POLL=1 to disable it.
+        // 50 ms matches the Windows driver's fastest poll (its front-end thread) and bounds how
+        // much garbage audio can play after a disconnect; one poll takes ~6 ms.
+        static constexpr auto STATUS_POLL_INTERVAL = std::chrono::milliseconds(50);
         // Matches the Windows driver, whose synchronous URB helper (FUN_1400157c4) waits up to
         // 5 s per command transfer: replies can be slow while video is streaming. Note that a
         // poll in flight at shutdown can delay exit by up to this long per transfer.
@@ -109,6 +115,7 @@ namespace libusb {
         static constexpr int STATUS_MAX_CONSECUTIVE_FAILURES = 10;
 
         lgx2::DeviceType _deviceType{lgx2::DeviceType::LGX2};
+        std::atomic<bool> _signalPresent{true};
         std::thread _statusThread;
         std::mutex _statusMutex;
         std::condition_variable _statusWake;

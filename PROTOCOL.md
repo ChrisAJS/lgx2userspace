@@ -500,8 +500,11 @@ been reconfigured for the detected Resolution", `AssertHpdAndTerm`,
 `ConfigureAAFilters`, `ConfigureDriveStrength`) and the front-end thread
 handles the passthrough ports.
 
-**Userspace status poll.** `UsbStream` now runs a read-only 200 ms poll
-(`statusPollLoop`, GC551 only, disable with `LGX2_NO_STATUS_POLL`). It reads IO
+**Userspace status poll.** `UsbStream` now runs a read-only poll every 50 ms
+(`statusPollLoop`, GC551 only, disable with `LGX2_NO_STATUS_POLL`). It started at
+200 ms, like the ADV7604 thread, and was lowered to match the driver's fastest
+(front-end) poll, because it now also drives audio muting and video blanking
+on signal loss. It also reads IO 0x02/0x60 and AVI InfoFrame byte 1. It reads IO
 0x0C/0x12/0x6A/0x6F, CP 0xB1, HDMI 0x05–0x0C, 0x20–0x25, 0x2A–0x35 and 0x3B
 (9 bridge reads, block reads ≤ 13 bytes), decodes them with `SignalStatus`
 (Linux `no_signal()` + `query_dv_timings` logic) and prints a line when the

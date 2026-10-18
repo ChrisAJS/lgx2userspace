@@ -44,7 +44,12 @@ namespace sdl {
     }
 
 
+    void SdlVideoOutput::showNoSignal() {
+        _noSignal = true;
+    }
+
     void SdlVideoOutput::videoFrameAvailable(uint32_t *image) {
+        _noSignal = false;
         if (_targetScale == lgx2::VideoScale::Full) {
             // YUY2: 2 bytes per pixel, pitch = width * 2
             if (!SDL_UpdateTexture(_texture, nullptr, image, 1920 * 2)) {
@@ -81,7 +86,9 @@ namespace sdl {
             SDL_SetWindowFullscreen(_window, false);
         }
 
-        SDL_RenderTexture(_renderer, _texture, nullptr, nullptr);
+        // Draw colour is black (set at initialisation).
+        SDL_RenderClear(_renderer);
+        if (!_noSignal) SDL_RenderTexture(_renderer, _texture, nullptr, nullptr);
         SDL_RenderPresent(_renderer);
     }
 

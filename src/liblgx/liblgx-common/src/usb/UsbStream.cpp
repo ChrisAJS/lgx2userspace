@@ -361,11 +361,13 @@ namespace libusb {
                     fprintf(stderr, "HDMI input status poll failed %d times in a row (%s on %s, last attempt %lld ms) — stopping the poll\n",
                             consecutiveFailures, libusb_error_name(res), _lastCommandFailure,
                             static_cast<long long>(pollMs));
+                    _signalPresent = true; // no longer known: never leave audio muted for good
                     return;
                 }
             } else {
                 consecutiveFailures = 0;
                 lgx2::SignalStatus status = lgx2::SignalStatus::decode(regs);
+                _signalPresent = status.signalPresent();
                 if (!haveStatus || status != lastStatus) {
                     // The poll duration shows how slowly the bridge answers mid-stream.
                     printf("HDMI input: %s (status poll took %lld ms)\n", status.describe().c_str(),
@@ -443,8 +445,10 @@ namespace libusb {
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - start).count();
         if (res == LIBUSB_SUCCESS) {
+            lgx2::SignalStatus status = lgx2::SignalStatus::decode(regs);
+            _signalPresent = status.signalPresent();
             printf("HDMI input (before streaming): %s (status read took %lld ms)\n",
-                   lgx2::SignalStatus::decode(regs).describe().c_str(), static_cast<long long>(ms));
+                   status.describe().c_str(), static_cast<long long>(ms));
         } else {
             fprintf(stderr, "HDMI input status read before streaming failed: %s on %s after %lld ms\n",
                     libusb_error_name(res), _lastCommandFailure, static_cast<long long>(ms));
@@ -594,6 +598,10 @@ namespace libusb {
 
     uint64_t UsbStream::transferErrors() const {
         return _transferErrors.load(std::memory_order_relaxed);
+    }
+
+    bool UsbStream::signalPresent() const {
+        return _signalPresent.load(std::memory_order_relaxed);
     }
 
     void UsbStream::queueAllFrameReads() {

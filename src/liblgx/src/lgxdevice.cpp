@@ -44,6 +44,10 @@ namespace lgx2 {
     }
 
     void Device::run() {
+        // Checked every loop, not only when packets arrive: a disconnected input may stop
+        // delivering data altogether.
+        updateSignalState();
+
         _logger->logTimeStart("streamUpdate");
         _stream->update();
         _logger->logTimeEnd("streamUpdate", "Stream update");
@@ -71,7 +75,25 @@ namespace lgx2 {
         }
     }
 
+    void Device::updateSignalState() {
+        bool present = _stream->signalPresent();
+        _audioGate.update(present, utils::AudioGate::Clock::now());
+
+        if (_audioGate.open() != _audioGateReportedOpen) {
+            _audioGateReportedOpen = _audioGate.open();
+            printf("Audio %s\n", _audioGateReportedOpen ? "unmuted (HDMI signal settled)" : "muted (no HDMI signal)");
+        }
+
+        if (!present && !_videoBlanked) {
+            _videoOutput->showNoSignal();
+            _videoBlanked = true;
+        }
+    }
+
     void Device::produceVideoData(uint32_t, const uint8_t *data) {
+        // Without a signal any frame that still parses is stale or garbage: keep the output blank.
+        if (!_stream->signalPresent()) return;
+        _videoBlanked = false;
         _videoOutput->videoFrameAvailable((uint32_t *) data);
 
         auto now = std::chrono::steady_clock::now();
@@ -99,7 +121,13 @@ namespace lgx2 {
     }
 
     void Device::produceAudioData(const uint8_t *data, uint32_t byteLength) {
-        _audioOutput->audioFrameAvailable(data, byteLength);
+        // Audio packets keep arriving (often as garbage) while the input has no signal; the gate
+        // ramps them to silence and keeps them silent until the signal has settled again. Silence
+        // is still sent so the output keeps a steady stream instead of under-running.
+        updateSignalState();
+        _audioScratch.assign(data, data + byteLength);
+        _audioGate.process(_audioScratch.data(), byteLength);
+        _audioOutput->audioFrameAvailable(_audioScratch.data(), byteLength);
     }
 
     void Device::shutdown() {

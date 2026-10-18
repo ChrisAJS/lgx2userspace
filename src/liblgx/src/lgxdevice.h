@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <string>
 #include <chrono>
+#include <vector>
+#include "AudioGate.h"
 #include "BufferReorderer.h"
 #include "FrameBuilder.h"
 
@@ -52,6 +54,10 @@ namespace lgx2 {
         virtual uint64_t droppedChunks() const { return 0; }
 
         virtual uint64_t transferErrors() const { return 0; }
+
+        // Whether the HDMI input currently has a usable signal (cable, TMDS lock, timing).
+        // Streams that cannot tell report true, so nothing is muted.
+        virtual bool signalPresent() const { return true; }
     };
 
     enum class VideoScale {
@@ -71,6 +77,10 @@ namespace lgx2 {
         virtual void display() = 0;
 
         virtual void shutdownVideo() = 0;
+
+        // The input has no signal: stop showing the last (or a garbage) frame until a new frame
+        // arrives. Outputs that cannot blank may ignore it.
+        virtual void showNoSignal() {}
 
     private:
     };
@@ -111,6 +121,13 @@ namespace lgx2 {
         utils::BufferReorderer _bufferReorderer;
         utils::FrameBuilder _frameBuilder;
         uint32_t _reportedOrderChanges{0};
+
+        utils::AudioGate _audioGate;
+        bool _audioGateReportedOpen{false};
+        std::vector<uint8_t> _audioScratch;
+        bool _videoBlanked{false};
+
+        void updateSignalState();
 
         std::function<void(uint8_t *, uint32_t, bool)> _onFrameData;
 

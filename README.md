@@ -78,7 +78,7 @@ cmake --build build
 
 | Variable | Description |
 |---|---|
-| `LGX2_NO_STATUS_POLL` | Set to any value to disable the HDMI input status poll. By default the LGX2 (GC551) is polled every 200 ms and changes are printed, e.g. `HDMI input: 1920x1080p @ 60.00 Hz (148.50 MHz, HDMI)` or `HDMI input: no cable`. |
+| `LGX2_NO_STATUS_POLL` | Set to any value to disable the HDMI input status poll. By default the LGX2 (GC551) is polled every 50 ms and changes are printed, e.g. `HDMI input: 1920x1080p @ 60.00 Hz (148.50 MHz, HDMI, YCbCr 4:2:2; receiver input colour space auto)` or `HDMI input: no cable`. The poll also mutes audio and blanks video while there is no signal; without it, nothing is muted. |
 | `LGX2_DUMP_FILE` | Path to write the first 128 raw USB chunks to, for offline stream analysis. |
 
 ## Setup

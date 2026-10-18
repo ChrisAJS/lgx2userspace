@@ -18,7 +18,10 @@ namespace sdl {
 
         void shutdownVideo() override;
 
+        void showNoSignal() override;
+
     private:
+        bool _noSignal{false}; // render black until the next frame arrives
         SDL_Window *_window{};
         SDL_Renderer *_renderer{};
         SDL_Texture *_texture{};

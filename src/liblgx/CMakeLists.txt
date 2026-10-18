@@ -11,7 +11,9 @@ set(LIBLGX_BASE_SOURCES
         src/FrameBuilder.cpp
         src/FrameBuilder.h
         src/BufferReorderer.cpp
-        src/BufferReorderer.h)
+        src/BufferReorderer.h
+        src/AudioGate.cpp
+        src/AudioGate.h)
 
 set(LOGGER_SOURCES
         src/logging/NOOPLogger.cpp
@@ -59,3 +61,8 @@ add_executable(bufferreorderer_test test/BufferReorderer.t.cpp test/catch_amalga
 target_include_directories(bufferreorderer_test PRIVATE src)
 target_link_libraries(bufferreorderer_test PRIVATE liblgx)
 add_test(bufferreorderer_test bufferreorderer_test)
+
+add_executable(audiogate_test test/AudioGate.t.cpp test/catch_amalgamated.cpp test/catch_amalgamated.hpp)
+target_include_directories(audiogate_test PRIVATE src)
+target_link_libraries(audiogate_test PRIVATE liblgx)
+add_test(audiogate_test audiogate_test)
