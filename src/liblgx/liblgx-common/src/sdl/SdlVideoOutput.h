@@ -18,10 +18,15 @@ namespace sdl {
 
         void shutdownVideo() override;
 
-        void showNoSignal() override;
+        void showNoSignal(lgx2::InputState reason) override;
 
     private:
-        bool _noSignal{false}; // render black until the next frame arrives
+        bool _noSignal{false}; // show the no-signal screen until the next frame arrives
+        lgx2::InputState _noSignalReason{lgx2::InputState::NoSignal};
+
+        void drawNoSignal();
+        void drawHdmiPlug(float centreX, float centreY, float width, uint8_t brightness, bool crossedOut);
+        void drawCentredText(const char *text, float centreY, float scale);
         SDL_Window *_window{};
         SDL_Renderer *_renderer{};
         SDL_Texture *_texture{};

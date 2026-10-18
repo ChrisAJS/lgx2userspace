@@ -34,6 +34,13 @@ namespace lgx2 {
         virtual void summarise() = 0;
     };
 
+    // State of the HDMI input, as far as the stream can tell.
+    enum class InputState {
+        Signal,   // usable signal (cable, TMDS lock, timing)
+        NoSignal, // cable connected (+5V present) but nothing usable: source off or re-locking
+        NoCable   // no +5V from a source
+    };
+
     class Stream {
     public:
         virtual ~Stream() = default;
@@ -55,9 +62,10 @@ namespace lgx2 {
 
         virtual uint64_t transferErrors() const { return 0; }
 
-        // Whether the HDMI input currently has a usable signal (cable, TMDS lock, timing).
-        // Streams that cannot tell report true, so nothing is muted.
-        virtual bool signalPresent() const { return true; }
+        // State of the HDMI input. Streams that cannot tell report Signal, so nothing is muted.
+        virtual InputState inputState() const { return InputState::Signal; }
+
+        bool signalPresent() const { return inputState() == InputState::Signal; }
     };
 
     enum class VideoScale {
@@ -78,9 +86,10 @@ namespace lgx2 {
 
         virtual void shutdownVideo() = 0;
 
-        // The input has no signal: stop showing the last (or a garbage) frame until a new frame
-        // arrives. Outputs that cannot blank may ignore it.
-        virtual void showNoSignal() {}
+        // The input has no signal (reason: NoSignal or NoCable): stop showing the last (or a
+        // garbage) frame and show that state until a new frame arrives. Called again if the
+        // reason changes. Outputs that cannot do this may ignore it.
+        virtual void showNoSignal(InputState reason) { (void) reason; }
 
     private:
     };
@@ -126,6 +135,7 @@ namespace lgx2 {
         bool _audioGateReportedOpen{false};
         std::vector<uint8_t> _audioScratch;
         bool _videoBlanked{false};
+        InputState _blankedFor{InputState::Signal};
 
         void updateSignalState();
 

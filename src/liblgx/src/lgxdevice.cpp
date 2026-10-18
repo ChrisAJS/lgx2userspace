@@ -76,7 +76,8 @@ namespace lgx2 {
     }
 
     void Device::updateSignalState() {
-        bool present = _stream->signalPresent();
+        InputState state = _stream->inputState();
+        bool present = state == InputState::Signal;
         _audioGate.update(present, utils::AudioGate::Clock::now());
 
         if (_audioGate.open() != _audioGateReportedOpen) {
@@ -84,9 +85,10 @@ namespace lgx2 {
             printf("Audio %s\n", _audioGateReportedOpen ? "unmuted (HDMI signal settled)" : "muted (no HDMI signal)");
         }
 
-        if (!present && !_videoBlanked) {
-            _videoOutput->showNoSignal();
+        if (!present && (!_videoBlanked || _blankedFor != state)) {
+            _videoOutput->showNoSignal(state);
             _videoBlanked = true;
+            _blankedFor = state;
         }
     }
 

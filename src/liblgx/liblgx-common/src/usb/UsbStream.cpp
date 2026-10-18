@@ -16,6 +16,11 @@
 namespace libusb {
     static const int LGX_DATA_FRAME_LEN = 0x1FC000;
 
+    static lgx2::InputState inputStateOf(const lgx2::SignalStatus &status) {
+        if (status.signalPresent()) return lgx2::InputState::Signal;
+        return status.cableDetected ? lgx2::InputState::NoSignal : lgx2::InputState::NoCable;
+    }
+
     void UsbStream::probeTransferComplete(libusb_transfer *transfer) {
         static uint8_t frameStart[] = { 0x00, 0xFF, 0xFF, 0xC0 };
         auto *stream = static_cast<UsbStream *>(transfer->user_data);
@@ -361,13 +366,13 @@ namespace libusb {
                     fprintf(stderr, "HDMI input status poll failed %d times in a row (%s on %s, last attempt %lld ms) — stopping the poll\n",
                             consecutiveFailures, libusb_error_name(res), _lastCommandFailure,
                             static_cast<long long>(pollMs));
-                    _signalPresent = true; // no longer known: never leave audio muted for good
+                    _inputState = lgx2::InputState::Signal; // no longer known: never leave audio muted for good
                     return;
                 }
             } else {
                 consecutiveFailures = 0;
                 lgx2::SignalStatus status = lgx2::SignalStatus::decode(regs);
-                _signalPresent = status.signalPresent();
+                _inputState = inputStateOf(status);
                 if (!haveStatus || status != lastStatus) {
                     // The poll duration shows how slowly the bridge answers mid-stream.
                     printf("HDMI input: %s (status poll took %lld ms)\n", status.describe().c_str(),
@@ -446,7 +451,7 @@ namespace libusb {
                 std::chrono::steady_clock::now() - start).count();
         if (res == LIBUSB_SUCCESS) {
             lgx2::SignalStatus status = lgx2::SignalStatus::decode(regs);
-            _signalPresent = status.signalPresent();
+            _inputState = inputStateOf(status);
             printf("HDMI input (before streaming): %s (status read took %lld ms)\n",
                    status.describe().c_str(), static_cast<long long>(ms));
         } else {
@@ -600,8 +605,8 @@ namespace libusb {
         return _transferErrors.load(std::memory_order_relaxed);
     }
 
-    bool UsbStream::signalPresent() const {
-        return _signalPresent.load(std::memory_order_relaxed);
+    lgx2::InputState UsbStream::inputState() const {
+        return _inputState.load(std::memory_order_relaxed);
     }
 
     void UsbStream::queueAllFrameReads() {

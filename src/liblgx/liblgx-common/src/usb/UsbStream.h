@@ -31,9 +31,9 @@ namespace libusb {
         uint64_t droppedChunks() const override;
         uint64_t transferErrors() const override;
 
-        // From the HDMI status poll. True when the poll is disabled or has given up, so a broken
+        // From the HDMI status poll. Signal when the poll is disabled or has given up, so a broken
         // poll never mutes audio permanently.
-        bool signalPresent() const override;
+        lgx2::InputState inputState() const override;
 
     private:
         // A pool of outstanding bulk IN URBs keeps the pipeline full regardless of
@@ -115,7 +115,7 @@ namespace libusb {
         static constexpr int STATUS_MAX_CONSECUTIVE_FAILURES = 10;
 
         lgx2::DeviceType _deviceType{lgx2::DeviceType::LGX2};
-        std::atomic<bool> _signalPresent{true};
+        std::atomic<lgx2::InputState> _inputState{lgx2::InputState::Signal};
         std::thread _statusThread;
         std::mutex _statusMutex;
         std::condition_variable _statusWake;
