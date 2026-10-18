@@ -16,6 +16,12 @@ namespace app {
 
         lgx2::VideoScale scale();
 
+        // Capture from the LGX2 directly (-D, or implied by -d/-f/-x) rather than viewing lgx2d's
+        // output. Always true where lgx2d is not available (non-Linux).
+        bool direct();
+        // lgx2d's V4L2 device to view (-i); empty to find it by name.
+        const std::string &inputDevice();
+
     private:
         lgx2::VideoOutput *_videoOutput;
         lgx2::AudioOutput *_audioOutput;
@@ -23,6 +29,12 @@ namespace app {
         lgx2::DeviceType _deviceType{lgx2::DeviceType::LGX2};
         lgx2::Stream *_stream{nullptr};
         lgx2::VideoScale _scale{lgx2::VideoScale::Full};
+#ifdef __linux__
+        bool _direct{false};
+#else
+        bool _direct{true};
+#endif
+        std::string _inputDevice;
     };
 }
 

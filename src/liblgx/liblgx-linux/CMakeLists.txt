@@ -4,7 +4,9 @@ find_library(AO_LIB ao REQUIRED)
 
 set(V4LOUTPUT_SOURCES
         src/v4l/V4LFrameOutput.cpp
-        src/v4l/V4LFrameOutput.h)
+        src/v4l/V4LFrameOutput.h
+        src/v4l/V4LCaptureSource.cpp
+        src/v4l/V4LCaptureSource.h)
 
 set(LIBAO_SOURCES
         src/libao/AoAudioOutput.cpp

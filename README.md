@@ -97,7 +97,9 @@ After the rule has been added, unplug and re-plug in the LGX/LGX2.
 
 ## Running
 Once udev has been configured to grant read and write permission to the device it
-will be possible to run the application by executing `lgx2userspace`.
+will be possible to run the application by executing `lgx2userspace`. On Linux this views the
+output of the capture daemon by default (see *Watching lgx2d's output* below); add `-D` to
+capture from the device directly.
 
 If you are using the LGX GC550, use the command line option `x` - `./lgx2userspace -x`.
 
@@ -218,8 +220,25 @@ not reattach to the new one by themselves; if audio stays silent after a restart
 While capturing, `lgx2d` uses roughly 10% of one CPU core for 1080p; with the LGX2 attached but
 no HDMI signal about 1%, and with no LGX2 attached well under 1%.
 
+## Watching lgx2d's output
+On Linux, `lgx2userspace` on its own is a viewer for `lgx2d`: it shows the video from the
+**LGX2** loopback device and plays **LGX2 Audio**, without touching the LGX2 itself.
+
+v4l2loopback (0.15 and later) lets only one application at a time capture video from a device,
+so the viewer and OBS cannot both show the video at once: whichever starts capturing second
+fails with "Device or resource busy". Audio has no such limit.
+
+```bash
+./lgx2userspace
+```
+
+* If no device named **LGX2** is offering video, it exits and asks whether `lgx2d` is running.
+  Use `-i /dev/video99` to name the device yourself.
+* `-D` captures from the LGX2 directly instead (as on other platforms), without `lgx2d`; stop
+  `lgx2d` first, since only one program can own the LGX2. `-d`, `-f` and `-x` imply `-D`.
+
 ## Running the viewer with V4L2 output
-Run the userspace driver with the `-d` option to specify which V4L2Loopback device to use
+Without `lgx2d`, run the userspace driver with the `-d` option to specify which V4L2Loopback device to use
 (see *Setting up a V4L2 loopback device* above):
 
 ```bash

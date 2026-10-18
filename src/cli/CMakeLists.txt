@@ -22,3 +22,9 @@ else()
         target_link_libraries(lgx2userspace PRIVATE ${ASYNCNS_LIB})
     endif()
 endif()
+
+# Viewing lgx2d's audio needs the PipeWire library (built when libpipewire-0.3 is found).
+if (TARGET liblgx-pipewire)
+    target_link_libraries(lgx2userspace PRIVATE liblgx-pipewire)
+    target_compile_definitions(lgx2userspace PRIVATE LGX2_VIEWER_PIPEWIRE)
+endif()

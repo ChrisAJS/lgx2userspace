@@ -26,22 +26,38 @@ lgx2::VideoScale app::OptionParser::scale() {
     return _scale;
 }
 
+bool app::OptionParser::direct() {
+    return _direct;
+}
+
+const std::string &app::OptionParser::inputDevice() {
+    return _inputDevice;
+}
+
 bool app::OptionParser::process(int argc, char **argv) {
     for(;;)
     {
-        switch(getopt(argc, argv, "vVd:hxsgfS:"))
+        switch(getopt(argc, argv, "vVd:hxsgfS:Di:"))
         {
 #ifndef __MINGW32__
 #ifndef __APPLE__
             case 'd':
                 std::cout << "Attempting to output to V4L2Loopback device: " << optarg << std::endl;
                 _videoOutput = new v4l::V4LFrameOutput(optarg);
+                _direct = true;
+                continue;
+            case 'i':
+                _inputDevice = optarg;
                 continue;
 #endif
 #endif
+            case 'D':
+                _direct = true;
+                continue;
             case 'f':
                 std::cout << "Using fake USB stream - reading data from 'dump.bin'" << std::endl;
                 _stream = new FakeUsbStream();
+                _direct = true;
                 continue;
             case 'v':
                 std::cout <<"Logging diagnostics information at end of execution" << std::endl;
@@ -55,6 +71,7 @@ bool app::OptionParser::process(int argc, char **argv) {
             case 'x':
                 std::cout << "Using the LGX GC550 support" << std::endl;
                 _deviceType = lgx2::DeviceType::LGX;
+                _direct = true;
                 continue;
 #endif
             case 's':
@@ -75,12 +92,17 @@ bool app::OptionParser::process(int argc, char **argv) {
             default :
                 std::cout << argv[0] <<
                     " usage:\n"
+#ifdef __linux__
+                    "By default, shows the video and audio lgx2d is capturing (start lgx2d first).\n"
+                    "\t-D\tCapture from the LGX2 directly instead (lgx2d must not be running)\n"
+                    "\t-i V4L2Device\tlgx2d's V4L2 device to view (default: find the device named LGX2)\n"
+#endif
                     "\t-h\tPrint this usage message\n"
                     "\t-v\tPrint diagnostics information summary at end of execution, useful when submitting bugs\n"
                     "\t-V\tPrint diagnostic information during execution\n"
 #ifndef __MINGW32__
 #ifndef __APPLE__
-                    "\t-d V4L2LoopbackDevice\tSpecify the V4L2Loopback device to output video to (e.g. /dev/video99)\n"
+                    "\t-d V4L2LoopbackDevice\tWhen capturing directly, output video to this V4L2Loopback device (e.g. /dev/video99)\n"
 #endif
 #endif
 #ifdef GC550_SUPPORT
