@@ -11,7 +11,15 @@ set(BOOTSTRAP_SOURCES
 
 set(USB_SOURCES
         src/usb/UsbStream.cpp
-        src/usb/UsbStream.h)
+        src/usb/UsbStream.h
+        src/usb/CommandBridge.cpp
+        src/usb/CommandBridge.h
+        src/usb/Bootstrapper.cpp
+        src/usb/Bootstrapper.h
+        src/usb/StatusMonitor.cpp
+        src/usb/StatusMonitor.h
+        src/usb/CaptureStream.cpp
+        src/usb/CaptureStream.h)
 
 add_library(liblgx-usb STATIC ${USB_SOURCES} ${BOOTSTRAP_SOURCES})
 
