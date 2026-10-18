@@ -2,6 +2,7 @@
 #define LGX2USERSPACE_USBCONTEXT_H
 
 #include <atomic>
+#include <functional>
 #include <thread>
 #include <vector>
 #include <libusb-1.0/libusb.h>
@@ -41,12 +42,27 @@ namespace libusb {
         // Supported cards currently attached and on a USB 3 link (others are reported and skipped).
         std::vector<FoundDevice> findDevices();
 
+        // Whether `device` is a supported card on a USB 3 link; reports why not otherwise.
+        static bool usable(libusb_device *device, lgx2::DeviceType &type);
+
+        // Called for each LGX2 that arrives or leaves; cards already attached are reported as
+        // arrivals straight away. Runs on the event thread (or the calling thread, for the initial
+        // arrivals), so it must only queue work: opening a device from it is not allowed.
+        using HotplugCallback = std::function<void(libusb_device *device, bool arrived)>;
+        void watchDevices(HotplugCallback callback);
+
     private:
         libusb_context *_context{nullptr};
         std::thread _eventThread;
         std::atomic<bool> _stopping{false};
 
+        HotplugCallback _hotplugCallback;
+        libusb_hotplug_callback_handle _hotplugHandle{0};
+        bool _watching{false};
+
         void eventLoop();
+        static int hotplugEvent(libusb_context *context, libusb_device *device, libusb_hotplug_event event,
+                                void *userData);
     };
 }
 

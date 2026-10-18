@@ -145,6 +145,26 @@ ls /dev/video99
 /dev/video99
 ```
 
+If the module is already loaded (OBS loads it for its Virtual Camera), `modprobe` ignores the
+options and no new device appears. Add one to the running module instead:
+
+```bash
+sudo v4l2loopback-ctl add -n LGX2 -x 1 /dev/video99
+```
+
+## Running the capture daemon (lgx2d)
+`lgx2d` captures without a window, for use by OBS and other software through a V4L2 loopback
+device. It waits for the LGX2 to be plugged in, bootstraps it, captures until it is unplugged,
+and then waits again, so it can be left running. While there is no picture it keeps sending a
+card saying why ("NO CAPTURE DEVICE", "NO HDMI CABLE", "NO SIGNAL"), so the device never stops
+producing frames.
+
+```bash
+./src/lgx2d/lgx2d -d /dev/video99
+```
+
+Stop it with Ctrl+C. Audio is not yet output by the daemon.
+
 ### Running with a V4L2 device
 Run the userspace driver with the `-d` option to specify which V4L2Loopback device to use:
 

@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <stdexcept>
+#include <string>
 
 namespace libusb {
 
@@ -25,6 +26,7 @@ namespace libusb {
     }
 
     UsbContext::~UsbContext() {
+        if (_watching) libusb_hotplug_deregister_callback(_context, _hotplugHandle);
         _stopping = true;
         libusb_interrupt_event_handler(_context);
         if (_eventThread.joinable()) _eventThread.join();
@@ -40,6 +42,36 @@ namespace libusb {
         }
     }
 
+    bool UsbContext::usable(libusb_device *device, lgx2::DeviceType &type) {
+        libusb_device_descriptor desc{};
+        libusb_get_device_descriptor(device, &desc);
+        if (desc.idVendor != 0x07ca) return false;
+
+        if (desc.idProduct == 0x0551) {
+            if (desc.bcdUSB >= 0x300) {
+                printf("LGX2 (GC551) detected\n");
+                type = lgx2::DeviceType::LGX2;
+                return true;
+            }
+            fprintf(stderr, "LGX2 (GC551) detected, but the device is not using USB3. Ensure you are using a USB3 port (often denoted with a specific colour on systems with both USB2 and 3) and that you are using a cable that is capable of USB3 speeds.\n");
+        }
+#ifdef GC550_SUPPORT
+        else if (desc.idProduct == 0x4710) {
+            if (desc.bcdUSB >= 0x300) {
+                printf("LGX (GC550) detected\n");
+                type = lgx2::DeviceType::LGX;
+                return true;
+            }
+            fprintf(stderr, "LGX (GC550) detected, but the device is not using USB3. Ensure you are using a USB3 port (often denoted with a specific colour on systems with both USB2 and 3) and that you are using a cable that is capable of USB3 speeds.\n");
+        }
+#else
+        else if (desc.idProduct == 0x4710) {
+            fprintf(stderr, "LGX (GC550) detected - but support for device not compiled in.\n");
+        }
+#endif
+        return false;
+    }
+
     std::vector<FoundDevice> UsbContext::findDevices() {
         std::vector<FoundDevice> found;
 
@@ -47,37 +79,36 @@ namespace libusb {
         ssize_t count = libusb_get_device_list(_context, &list);
 
         for (ssize_t idx = 0; idx < count; ++idx) {
-            libusb_device *device = list[idx];
-            libusb_device_descriptor desc{};
-
-            libusb_get_device_descriptor(device, &desc);
-            if (desc.idVendor != 0x07ca) continue;
-
-            if (desc.idProduct == 0x0551) {
-                if (desc.bcdUSB >= 0x300) {
-                    printf("LGX2 (GC551) detected\n");
-                    found.emplace_back(device, lgx2::DeviceType::LGX2);
-                } else {
-                    fprintf(stderr, "LGX2 (GC551) detected, but the device is not using USB3. Ensure you are using a USB3 port (often denoted with a specific colour on systems with both USB2 and 3) and that you are using a cable that is capable of USB3 speeds.\n");
-                }
-            }
-#ifdef GC550_SUPPORT
-            else if (desc.idProduct == 0x4710) {
-                if (desc.bcdUSB >= 0x300) {
-                    printf("LGX (GC550) detected\n");
-                    found.emplace_back(device, lgx2::DeviceType::LGX);
-                } else {
-                    fprintf(stderr, "LGX (GC550) detected, but the device is not using USB3. Ensure you are using a USB3 port (often denoted with a specific colour on systems with both USB2 and 3) and that you are using a cable that is capable of USB3 speeds.\n");
-                }
-            }
-#else
-            else if (desc.idProduct == 0x4710) {
-                fprintf(stderr, "LGX (GC550) detected - but support for device not compiled in.\n");
-            }
-#endif
+            lgx2::DeviceType type;
+            if (usable(list[idx], type)) found.emplace_back(list[idx], type);
         }
 
         libusb_free_device_list(list, 1);
         return found;
+    }
+
+    void UsbContext::watchDevices(HotplugCallback callback) {
+        if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
+            throw std::runtime_error("This platform's libusb does not support hotplug notifications");
+        }
+        _hotplugCallback = std::move(callback);
+        int res = libusb_hotplug_register_callback(
+                _context,
+                static_cast<libusb_hotplug_event>(LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
+                LIBUSB_HOTPLUG_ENUMERATE, 0x07ca, 0x0551, LIBUSB_HOTPLUG_MATCH_ANY,
+                &UsbContext::hotplugEvent, this, &_hotplugHandle);
+        if (res != LIBUSB_SUCCESS) {
+            throw std::runtime_error(std::string("Could not register for USB hotplug events: ") + libusb_error_name(res));
+        }
+        _watching = true;
+    }
+
+    int UsbContext::hotplugEvent(libusb_context *, libusb_device *device, libusb_hotplug_event event,
+                                 void *userData) {
+        auto *context = static_cast<UsbContext *>(userData);
+        if (context->_hotplugCallback) {
+            context->_hotplugCallback(device, event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
+        }
+        return 0; // stay registered
     }
 }

@@ -30,5 +30,8 @@ enable_testing() # at the top level so `ctest` in the build directory finds the 
 
 add_subdirectory(src/liblgx)
 add_subdirectory(src/cli)
+if (CMAKE_SYSTEM MATCHES Linux)
+    add_subdirectory(src/lgx2d) # V4L2 output is Linux-only
+endif()
 
 include(version.cmake)

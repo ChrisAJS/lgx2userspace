@@ -2,9 +2,11 @@
 #define LGX2USERSPACE_V4LFRAMEOUTPUT_H
 
 #include <string>
-#include <lgxdevice.h>
+#include <lgxinterfaces.h>
 
 namespace v4l {
+    // Writes 1080p YUYV frames to a V4L2 output device (e.g. a v4l2loopback device), one write
+    // per frame as it arrives.
     class V4LFrameOutput : public lgx2::VideoOutput {
     public:
         explicit V4LFrameOutput(const std::string &deviceName);
@@ -18,8 +20,13 @@ namespace v4l {
         void shutdownVideo() override;
 
     private:
-        int _v4l2fd;
-        uint8_t *_frameBuffer;
+        static constexpr int WIDTH = 1920;
+        static constexpr int HEIGHT = 1080;
+        static constexpr int FRAME_BYTES = WIDTH * HEIGHT * 2;
+
+        std::string _deviceName;
+        int _v4l2fd{-1};
+        bool _reportedShortWrite{false};
     };
 }
 
