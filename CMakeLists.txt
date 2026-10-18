@@ -26,6 +26,8 @@ else()
     message("Dangerous LGX (GC550) support will not be compiled into the lgx2userspace executable.")
 endif()
 
+enable_testing() # at the top level so `ctest` in the build directory finds the tests
+
 add_subdirectory(src/liblgx)
 add_subdirectory(src/cli)
 

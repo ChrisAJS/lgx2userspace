@@ -15,6 +15,6 @@ add_library(liblgx-linux STATIC
         ${LIBAO_SOURCES})
 
 target_include_directories(liblgx-linux PUBLIC src)
-target_include_directories(liblgx-linux PRIVATE ../src)
+target_link_libraries(liblgx-linux PUBLIC liblgx-core)
 
 target_link_libraries(liblgx-linux PUBLIC ${AO_LIB})
