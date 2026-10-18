@@ -59,6 +59,10 @@ namespace libusb {
         if (_capture) _capture->deliver(callback);
     }
 
+    void DeviceSession::discard() {
+        if (_capture) _capture->discard();
+    }
+
     void DeviceSession::stop() {
         if (_dev == nullptr) return;
 

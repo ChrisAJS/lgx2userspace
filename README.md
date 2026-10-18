@@ -28,7 +28,7 @@ To build the project, you will need:
 * CMake
 * libusb
 * SDL3
-* V4L2Loopback
+* V4L2Loopback (at run time, for `lgx2d` and the viewer's `-d` option; see *Setting up a V4L2 loopback device*)
 * PipeWire development files (optional: audio output from `lgx2d`)
 
 ### Ubuntu 24.04+
@@ -48,7 +48,8 @@ sudo pacman -S cmake libusb sdl3 v4l2loopback-dkms v4l2loopback-utils pipewire
 The following packages need to be installed:
 
 ```bash
-sudo dnf install cmake libusb1-devel SDL3-devel v4l2loopback pipewire-devel
+sudo dnf install cmake libusb1-devel SDL3-devel pipewire-devel
+sudo dnf install akmod-v4l2loopback v4l2loopback  # from RPM Fusion
 ```
 
 ### Build Command
@@ -130,49 +131,96 @@ process frame data and time taken to render both audio and video.
 This information could be valuable when identifying issues so please try your best to include it
 in any issues you raise, thank you!
 
-## Running with V4L2 Output
-### V4L2 Output setup
-To output video to a virtual webcam output source, load the V4L2 Loopback Linux module with an easy to identify device
-number:
+## Setting up a V4L2 loopback device
+Both `lgx2d` (the capture daemon) and the viewer's `-d` option output video through a
+[v4l2loopback](https://github.com/v4l2loopback/v4l2loopback) device: a virtual webcam that OBS,
+browsers and other software can open.
+
+### Installing v4l2loopback
+v4l2loopback is a kernel module, built for your kernel by the package:
+
+* Ubuntu: `sudo apt install v4l2loopback-dkms v4l2loopback-utils`
+* Arch Linux: `sudo pacman -S v4l2loopback-dkms v4l2loopback-utils`
+* Fedora: `sudo dnf install akmod-v4l2loopback v4l2loopback` (from
+  [RPM Fusion](https://rpmfusion.org/Configuration); the module is built on first install, which
+  takes a minute; with Secure Boot enabled the module must be signed, which the akmod normally
+  handles)
+
+### Creating the device
+If the module is not loaded yet, load it with an easy to identify device number:
 
 ```bash
 sudo modprobe v4l2loopback video_nr=99 exclusive_caps=1 card_label="LGX2"
 ```
 
-You should now see `/dev/video99` exists:
+`exclusive_caps=1` makes the device look like an ordinary webcam to OBS and browsers.
 
-```bash
-ls /dev/video99
-/dev/video99
-```
-
-If the module is already loaded (OBS loads it for its Virtual Camera), `modprobe` ignores the
-options and no new device appears. Add one to the running module instead:
+**If the module is already loaded** (OBS loads it for its Virtual Camera, for example), `modprobe`
+silently ignores these options and no new device appears. Add a device to the running module
+instead:
 
 ```bash
 sudo v4l2loopback-ctl add -n LGX2 -x 1 /dev/video99
 ```
 
+Check it exists (`v4l2-ctl --list-devices` also shows its name):
+
+```bash
+ls /dev/video99
+```
+
+### Keeping the device across reboots
+Devices created as above disappear on reboot. To create one at boot, have the module load with
+your options, for example in `/etc/modules-load.d/v4l2loopback.conf`:
+
+```
+v4l2loopback
+```
+
+and in `/etc/modprobe.d/v4l2loopback.conf`:
+
+```
+options v4l2loopback video_nr=99 exclusive_caps=1 card_label="LGX2"
+```
+
+If you also use OBS's Virtual Camera, create one device for each, so OBS does not load the
+module itself with only its own device:
+
+```
+options v4l2loopback devices=2 video_nr=99,98 exclusive_caps=1,1 card_label="LGX2,OBS Virtual Camera"
+```
+
 ## Running the capture daemon (lgx2d)
-`lgx2d` captures without a window, for use by OBS and other software through a V4L2 loopback
-device. It waits for the LGX2 to be plugged in, bootstraps it, captures until it is unplugged,
-and then waits again, so it can be left running. While there is no picture it keeps sending a
-card saying why ("NO CAPTURE DEVICE", "NO HDMI CABLE", "NO SIGNAL"), so the device never stops
-producing frames.
+`lgx2d` captures without a window, for use by OBS and other software. It waits for the LGX2 to be
+plugged in, bootstraps it, captures until it is unplugged, and then waits again, so it can be
+left running. While there is no picture it keeps sending a card saying why ("NO CAPTURE DEVICE",
+"NO HDMI CABLE", "NO SIGNAL"), so the video device never stops producing frames.
+
+With a loopback device set up (see above):
 
 ```bash
 ./src/lgx2d/lgx2d -d /dev/video99
 ```
 
-Audio is published as a PipeWire source called **LGX2 Audio**: in OBS add an *Audio Input
-Capture (PipeWire)* source and select it. Several applications can record from it at once. It
-is muted while there is no signal. Pass `-A` to disable audio, or build without PipeWire
-development files installed to leave it out entirely.
+* **Video:** in OBS add a *Video Capture Device (V4L2)* source and select **LGX2**.
+* **Audio** is published as a PipeWire source called **LGX2 Audio**: in OBS add an *Audio Input
+  Capture (PipeWire)* source and select it. Several applications can record from it at once. It
+  is muted while there is no signal. Pass `-A` to disable audio; building without the PipeWire
+  development files leaves it out entirely.
+* `-p` disables the HDMI status poll (and with it muting and the no-signal cards). Stop with
+  Ctrl+C.
 
-Stop it with Ctrl+C.
+**Restarting lgx2d:** the video device persists, but each run of `lgx2d` creates a new
+**LGX2 Audio** node. Applications that were recording from the previous one (OBS included) may
+not reattach to the new one by themselves; if audio stays silent after a restart, reselect
+**LGX2 Audio** in the application (in OBS, open the source's properties and choose it again).
 
-### Running with a V4L2 device
-Run the userspace driver with the `-d` option to specify which V4L2Loopback device to use:
+While capturing, `lgx2d` uses roughly 10% of one CPU core for 1080p; with the LGX2 attached but
+no HDMI signal about 1%, and with no LGX2 attached well under 1%.
+
+## Running the viewer with V4L2 output
+Run the userspace driver with the `-d` option to specify which V4L2Loopback device to use
+(see *Setting up a V4L2 loopback device* above):
 
 ```bash
 ./lgx2userspace -d /dev/video99

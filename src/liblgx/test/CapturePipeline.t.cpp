@@ -84,11 +84,6 @@ namespace {
         void render() override {}
         void shutdownAudio() override {}
     };
-
-    bool allZero(const std::vector<uint8_t> &bytes) {
-        for (uint8_t b : bytes) if (b != 0) return false;
-        return true;
-    }
 }
 
 TEST_CASE("With a settled signal, frames and audio reach the outputs") {
@@ -113,7 +108,7 @@ TEST_CASE("With a settled signal, frames and audio reach the outputs") {
     CHECK(video.noSignalCalls.empty());
 }
 
-TEST_CASE("Without a signal, frames are withheld, the output is told why, and audio is silent") {
+TEST_CASE("Without a signal, the stream is not processed and the output is told why") {
     FakeVideo video;
     FakeAudio audio;
     CapturePipeline pipeline{&video, &audio, CapturePipeline::Options{}};
@@ -123,16 +118,45 @@ TEST_CASE("Without a signal, frames are withheld, the output is told why, and au
     pipeline.setInputState(InputState::NoCable, t + 50ms); // repeated: not reported again
     REQUIRE(video.noSignalCalls == std::vector<InputState>{InputState::NoCable});
 
+    CHECK_FALSE(pipeline.wantsData());
     auto data = stream(2);
     feedAll(pipeline, data);
     CHECK(video.frames.empty());
     CHECK(pipeline.videoFramesEmitted() == 0);
-    REQUIRE(audio.packets.size() == 2);
-    CHECK(allZero(audio.packets[0]));
-    CHECK(allZero(audio.packets[1]));
+    CHECK(audio.packets.empty()); // not even parsed: the output plays silence when starved
 
     pipeline.setInputState(InputState::NoSignal, t + 100ms); // reason changed: reported
     CHECK(video.noSignalCalls == std::vector<InputState>{InputState::NoCable, InputState::NoSignal});
+}
+
+TEST_CASE("When the signal returns mid-stream, parsing restarts cleanly at the next frame") {
+    FakeVideo video;
+    FakeAudio audio;
+    CapturePipeline pipeline{&video, &audio, CapturePipeline::Options{}};
+    CapturePipeline::Clock::time_point t{};
+    auto data = stream(4);
+
+    // The first part of the stream arrives while there is no signal and is skipped; it ends
+    // part-way through the second frame.
+    const size_t split = data.size() / 3;
+    pipeline.setInputState(InputState::NoSignal, t);
+    pipeline.feed(data.data(), static_cast<uint32_t>(split), false);
+
+    pipeline.setInputState(InputState::Signal, t + 100ms);
+    REQUIRE(pipeline.wantsData());
+    for (size_t offset = split; offset < data.size(); offset += 0x1FC000) {
+        uint32_t length = static_cast<uint32_t>(std::min<size_t>(0x1FC000, data.size() - offset));
+        pipeline.feed(data.data() + offset, length, false);
+    }
+
+    // The partial frame at the join is not shown; the later complete frames are, intact.
+    REQUIRE_FALSE(video.frames.empty());
+    CHECK(video.frames.size() <= 2);
+    const auto &last = video.frames.back();
+    for (uint32_t i = 0; i < FRAME_BYTES; i += 997) {
+        REQUIRE(last[i] == frameByte(i, 3 * 0x21));
+    }
+    CHECK(pipeline.desyncCount() == 0);
 }
 
 TEST_CASE("Keep-alive frames carry the no-signal card at the configured rate") {
@@ -194,4 +218,65 @@ TEST_CASE("The no-signal card is a 1080p YUY2 frame with the message drawn in") 
     auto *other = reinterpret_cast<uint8_t *>(card.frame(InputState::NoCable));
     CHECK_FALSE(std::equal(noSignal.begin(), noSignal.end(), other));
     CHECK(std::string(NoSignalCard::message(InputState::NoDevice)) == "NO CAPTURE DEVICE");
+}
+
+TEST_CASE("Audio resumes after the signal is lost and comes back") {
+    FakeVideo video;
+    FakeAudio audio;
+    CapturePipeline pipeline{&video, &audio, CapturePipeline::Options{}};
+    CapturePipeline::Clock::time_point t{};
+    auto data = stream(3);
+
+    // Signal settled: audio flows.
+    pipeline.setInputState(InputState::Signal, t);
+    pipeline.setInputState(InputState::Signal, t + 600ms);
+    feedAll(pipeline, data);
+    REQUIRE(audio.packets.size() == 3);
+    REQUIRE(audio.packets.back()[0] == (1000 & 0xFF));
+
+    // HDMI unplugged: data is skipped.
+    pipeline.setInputState(InputState::NoCable, t + 1s);
+    feedAll(pipeline, data);
+    REQUIRE(audio.packets.size() == 3);
+
+    // HDMI back and settled: audio must flow again.
+    pipeline.setInputState(InputState::Signal, t + 2s);
+    pipeline.setInputState(InputState::Signal, t + 2600ms);
+    audio.packets.clear();
+    feedAll(pipeline, data);
+    REQUIRE_FALSE(audio.packets.empty());
+    CHECK(audio.packets.back()[0] == (1000 & 0xFF));
+}
+
+TEST_CASE("Without a signal, silence is sent at the real audio rate") {
+    FakeAudio audio;
+    CapturePipeline pipeline{nullptr, &audio, CapturePipeline::Options{}};
+    CapturePipeline::Clock::time_point t{};
+    pipeline.setInputState(InputState::NoCable, t);
+
+    // One second of 2 ms ticks.
+    for (int ms = 2; ms <= 1000; ms += 2) pipeline.tick(t + std::chrono::milliseconds(ms));
+
+    size_t total = 0;
+    for (const auto &packet : audio.packets) {
+        total += packet.size();
+        CHECK(packet.size() % 4 == 0);
+        for (uint8_t b : packet) REQUIRE(b == 0);
+    }
+    // 48 kHz x 4 bytes, within one 10 ms chunk.
+    CHECK(total >= 192000 - 1920);
+    CHECK(total <= 192000);
+    CHECK(audio.packets.size() <= 101); // batched, not one write per tick
+
+    // A stalled loop does not burst a backlog.
+    audio.packets.clear();
+    pipeline.tick(t + 10s);
+    REQUIRE(audio.packets.size() == 1);
+    CHECK(audio.packets[0].size() <= 192000 / 10);
+
+    // With a signal, no silence is generated.
+    audio.packets.clear();
+    pipeline.setInputState(InputState::Signal, t + 11s);
+    pipeline.tick(t + 12s);
+    CHECK(audio.packets.empty());
 }

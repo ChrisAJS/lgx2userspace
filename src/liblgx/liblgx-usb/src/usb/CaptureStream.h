@@ -34,6 +34,10 @@ namespace libusb {
         // Hand every queued chunk to the callback.
         void deliver(const ChunkCallback &callback);
 
+        // Drop every queued chunk without copying it out; the next delivered chunk is flagged
+        // gapped.
+        void discard();
+
         // Cancel outstanding transfers and wait until every one has completed.
         void stop();
 

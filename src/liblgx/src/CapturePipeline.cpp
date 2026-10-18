@@ -17,7 +17,23 @@ namespace lgx2 {
         });
     }
 
+    bool CapturePipeline::wantsData() const {
+        return _inputState == InputState::Signal;
+    }
+
     void CapturePipeline::feed(uint8_t *chunk, uint32_t length, bool gapped) {
+        // Without a signal nothing from the stream would be shown or heard, so skip the work. The
+        // device keeps streaming (reads must never stop), and the first chunk once the signal is
+        // back is treated as following a gap so the parsers start clean.
+        if (!wantsData()) {
+            _resyncPending = true;
+            return;
+        }
+        if (_resyncPending) {
+            gapped = true;
+            _resyncPending = false;
+        }
+
         // The BufferReorderer first restores the device's 16 KiB DMA buffer order (pairs can arrive
         // swapped after an unclean stop), then hands the stream to the FrameBuilder state machine,
         // which does all marker detection, header validation and frame/audio assembly. A gap flags
@@ -41,6 +57,13 @@ namespace lgx2 {
             printf("Audio %s\n", _audioGateReportedOpen ? "unmuted (HDMI signal settled)" : "muted (no HDMI signal)");
         }
 
+        if (present) {
+            _sendingSilence = false;
+        } else if (!_sendingSilence) {
+            _sendingSilence = true;
+            _silenceSentUpTo = now; // silence starts from when the signal was lost
+        }
+
         if (!present && (!_videoBlanked || _blankedFor != state)) {
             if (_video) _video->showNoSignal(state);
             _videoBlanked = true;
@@ -49,7 +72,27 @@ namespace lgx2 {
         }
     }
 
+    void CapturePipeline::sendSilence(Clock::time_point now) {
+        if (_audio == nullptr || !_sendingSilence) return;
+        auto owed = now - _silenceSentUpTo;
+        if (owed < SILENCE_CHUNK) return;
+        if (owed > SILENCE_MAX) {
+            // Ticks stalled (e.g. a bootstrap blocked the loop): don't burst seconds of backlog.
+            _silenceSentUpTo = now - SILENCE_MAX;
+            owed = SILENCE_MAX;
+        }
+        auto bytes = static_cast<uint32_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(owed).count() * AUDIO_BYTES_PER_SECOND / 1000000);
+        bytes -= bytes % 4; // whole stereo frames
+        if (bytes == 0) return;
+        _silenceSentUpTo += std::chrono::microseconds(static_cast<int64_t>(bytes) * 1000000 / AUDIO_BYTES_PER_SECOND);
+        if (_silence.size() < bytes) _silence.resize(bytes, 0);
+        _audio->audioFrameAvailable(_silence.data(), bytes);
+    }
+
     void CapturePipeline::tick(Clock::time_point now) {
+        if (_inputState != InputState::Signal) sendSilence(now);
+
         if (!_options.keepAliveFrames || _video == nullptr || _inputState == InputState::Signal) return;
         if (_lastKeepAlive != Clock::time_point{} && now - _lastKeepAlive < _options.keepAliveInterval) return;
         _lastKeepAlive = now;

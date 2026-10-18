@@ -36,6 +36,9 @@ namespace libusb {
         // Hand queued stream chunks to the callback.
         void deliver(const CaptureStream::ChunkCallback &callback);
 
+        // Drop queued stream chunks unread (when nothing wants them); reading continues.
+        void discard();
+
         // Stop streaming and polling, then release and reset the device. Idempotent.
         void stop();
 

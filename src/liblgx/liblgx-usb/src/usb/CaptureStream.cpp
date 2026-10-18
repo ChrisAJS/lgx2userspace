@@ -133,6 +133,13 @@ namespace libusb {
         }
     }
 
+    void CaptureStream::discard() {
+        std::lock_guard<std::mutex> lock(_queueMutex);
+        if (_ringCount == 0) return;
+        _ringCount = 0;
+        _gapPending = true;
+    }
+
     void CaptureStream::stop() {
         {
             std::unique_lock<std::mutex> lock(_transfersMutex);

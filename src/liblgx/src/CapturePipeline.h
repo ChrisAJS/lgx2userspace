@@ -34,14 +34,19 @@ namespace lgx2 {
 
         CapturePipeline(VideoOutput *video, AudioOutput *audio, Options options);
 
-        // Feed one raw USB chunk; gapped=true means bytes were lost before it.
+        // Feed one raw USB chunk; gapped=true means bytes were lost before it. Ignored while there
+        // is no signal.
         void feed(uint8_t *chunk, uint32_t length, bool gapped);
+
+        // False while there is no signal: chunks would be ignored, so a caller may discard them
+        // without even copying them out (the stream must still be read).
+        bool wantsData() const;
 
         // Report the HDMI input state; call regularly, not only when data arrives (a disconnected
         // input may stop delivering data altogether).
         void setInputState(InputState state, Clock::time_point now);
 
-        // Emits keep-alive frames when due; call regularly.
+        // Emits keep-alive frames, and silence while there is no signal, when due; call regularly.
         void tick(Clock::time_point now);
 
         uint64_t videoFramesEmitted() const;   // captured frames passed to the video output
@@ -58,6 +63,7 @@ namespace lgx2 {
         uint32_t _reportedOrderChanges{0};
 
         InputState _inputState{InputState::Signal};
+        bool _resyncPending{false}; // data was skipped: treat the next chunk as following a gap
         utils::AudioGate _audioGate;
         bool _audioGateReportedOpen{false};
         std::vector<uint8_t> _audioScratch;
@@ -67,6 +73,18 @@ namespace lgx2 {
 
         NoSignalCard _card;
         Clock::time_point _lastKeepAlive{};
+
+        // While there is no signal the stream is not parsed, so no audio packets arrive; silence is
+        // sent instead at the real audio rate (48 kHz, 16-bit stereo), so outputs and their
+        // consumers see a continuous source (OBS would not recover otherwise).
+        static constexpr uint32_t AUDIO_BYTES_PER_SECOND = 48000 * 4;
+        static constexpr std::chrono::milliseconds SILENCE_CHUNK{10};
+        static constexpr std::chrono::milliseconds SILENCE_MAX{100};
+        bool _sendingSilence{false};
+        Clock::time_point _silenceSentUpTo{};
+        std::vector<uint8_t> _silence;
+
+        void sendSilence(Clock::time_point now);
 
         uint64_t _videoFramesEmitted{0};
         uint64_t _keepAliveFramesEmitted{0};

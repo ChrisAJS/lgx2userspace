@@ -42,14 +42,19 @@ namespace lgx2d {
             if (_session && _session->ended()) {
                 endSession(_session->endReason());
             }
-            if (_session) {
-                _session->deliver([this](uint8_t *data, uint32_t length, bool gapped) {
-                    _pipeline.feed(data, length, gapped);
-                });
-            }
-
             auto now = lgx2::CapturePipeline::Clock::now();
             _pipeline.setInputState(_session ? _session->inputState() : lgx2::InputState::NoDevice, now);
+
+            if (_session) {
+                if (_pipeline.wantsData()) {
+                    _session->deliver([this](uint8_t *data, uint32_t length, bool gapped) {
+                        _pipeline.feed(data, length, gapped);
+                    });
+                } else {
+                    // No signal: keep the USB reads going but skip copying the data out.
+                    _session->discard();
+                }
+            }
             _pipeline.tick(now);
 
             std::this_thread::sleep_for(LOOP_INTERVAL);
