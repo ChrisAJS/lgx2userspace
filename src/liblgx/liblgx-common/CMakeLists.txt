@@ -28,7 +28,9 @@ set(FAKE_USB_SOURCES
 
 set(USB_SOURCES
         src/usb/UsbStream.cpp
-        src/usb/UsbStream.h)
+        src/usb/UsbStream.h
+        src/SignalStatus.cpp
+        src/SignalStatus.h)
 
 set(ERRORSINK_SOURCES
         src/SimpleErrorSink.cpp

@@ -4,11 +4,13 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <libusb-1.0/libusb.h>
 #include "lgxdevice.h"
+#include "SignalStatus.h"
 
 namespace libusb {
 
@@ -84,6 +86,33 @@ namespace libusb {
 
         static constexpr int MAX_PROBE_ATTEMPTS = 8;
         int _probeAttempts{0};
+
+        // Periodic read-only HDMI input status poll (GC551 only), modelled on the Windows
+        // driver's 200 ms CRXADV7604 poll thread. It issues I2C reads over the command
+        // endpoints (bulk OUT/IN 0x01) while the stream runs on IN 0x83, and logs changes in
+        // cable/signal/resolution. Set LGX2_NO_STATUS_POLL=1 to disable it.
+        static constexpr auto STATUS_POLL_INTERVAL = std::chrono::milliseconds(200);
+        // Matches the Windows driver, whose synchronous URB helper (FUN_1400157c4) waits up to
+        // 5 s per command transfer: replies can be slow while video is streaming. Note that a
+        // poll in flight at shutdown can delay exit by up to this long per transfer.
+        static constexpr unsigned int COMMAND_TIMEOUT_MS = 5000;
+        // wMaxPacketSize of the command endpoints (SuperSpeed bulk).
+        static constexpr int COMMAND_MAX_PACKET = 1024;
+        static constexpr int STATUS_MAX_CONSECUTIVE_FAILURES = 10;
+
+        lgx2::DeviceType _deviceType{lgx2::DeviceType::LGX2};
+        std::thread _statusThread;
+        std::mutex _statusMutex;
+        std::condition_variable _statusWake;
+
+        // Which half of the last failed I2C read failed: "request (OUT 0x01)" or "reply (IN 0x81)".
+        const char *_lastCommandFailure{""};
+
+        void statusPollLoop();
+        void probeStatusBeforeStreaming();
+        int readAdvStatus(lgx2::AdvStatusRegisters &regs);
+        int i2cRead(uint8_t address, uint8_t reg, uint8_t *out, uint8_t count);
+        void drainCommandResponses();
 
         void readLoop();
 

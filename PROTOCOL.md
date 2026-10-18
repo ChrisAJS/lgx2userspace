@@ -10,12 +10,17 @@ built by observing live USB transfers and reading the Windows driver INF file
 ## Hardware
 
 The device is built around a **Cypress EZ-USB FX3** USB 3.0 controller
-(programmable ARM9 core) paired with an **ITE Technology HDMI receiver** IC.
-The INF file references chip indices `0:6604/7002` and `1:7604`, which are
-believed to be ITE IT6604/IT7002 and IT7604 HDMI receiver variants used in
-different board revisions (GC550 vs GC551).
+(programmable ARM9 core). **Correction:** the capture-side HDMI receiver is an
+**Analog Devices ADV7604**, not an ITE part — the driver's class names are
+`CRXADV7604::*` (118 methods, incl. `ADIAPI_*`/`HAL_*` from ADI's reference
+code), and the bootstrap stream programs the ADV7604's I2C map addresses and
+EDID RAM (see "Bootstrap command stream" below). The INF's `1:7604` is the
+ADV7604; `0:6604/7002` likely refers to the GC550's ITE IT6603/6604
+(`CVampVDecoderIT6603::*` in the driver). The GC551 also carries a
+**PCA9539A** 16-bit GPIO expander (`CPCA9539A::*`) and a separate 4K-capable
+HDMI 2.0 front-end (passthrough path), also found in the bootstrap stream.
 
-The ITE chip outputs captured video to the FX3 over a **dual-channel 10-bit
+The receiver outputs captured video to the FX3 over a **dual-channel 10-bit
 parallel bus (BT.1120)**. BT.1120 carries luma (Y) and chroma (CbCr) on
 separate 10-bit channels at pixel clock, with SAV (Start of Active Video) and
 EAV (End of Active Video) timing reference preambles on both channels
@@ -28,12 +33,18 @@ translates them into the `0xCxFFFF00` USB stream markers described below. The
 (one per channel, upper 8 bits = `0xFF`) arriving simultaneously on the
 parallel bus. This connection explains the entire sub-chunk framing structure.
 
-The FX3 firmware is loaded during the bootstrap sequence. The BMP files
-shipped alongside the driver (`aver_custom_no_signal.bmp`,
-`aver_custom_hdcp_protection.bmp`, `aver_custom_content_protection.bmp`,
-`aver_custom_out_of_range.bmp`) are believed to be overlay images uploaded
-into the FX3's framebuffer during bootstrap — they appear as embedded data
-inside the bootstrap command payloads in `commanddata_lgx2.h`.
+**Correction:** the bootstrap does not upload FX3 firmware or images. The BMP
+files shipped alongside the driver (`aver_custom_no_signal.bmp`,
+`aver_custom_out_of_range.bmp`, `aver_custom_hdcp_protection.bmp`,
+`aver_custom_content_protection.bmp`) are **never sent to the device**.
+`FUN_140021c3c` loads them host-side from `\SystemRoot\System32\drivers\`,
+accepts them only if they are exactly 640 × 480, and converts each into three
+640 × 480 × 2 (YUY2) kernel buffers (`FUN_140020840`). The same function
+allocates a 0x465000-byte (1920 × 1200 × 2) buffer pre-filled with
+limited-range black `0x80108010`. The "no signal" / "out of range" / HDCP
+screens are therefore synthesised by the Windows driver into the Ks stream; a
+userspace replacement has to draw its own. The bootstrap stream contains no
+bitmap — its largest single write is 32 bytes (an EDID block).
 
 ---
 
@@ -367,6 +378,194 @@ never creates the condition where that would be needed:
   clean SAV→EAV pair (checksums valid, EAV c0 matches SAV b0) before
   accepting frames again. This mirrors what the driver's desync counter
   (context+0x8002c8, incremented on SAV/EAV mismatch) tracks.
+
+---
+
+## Bootstrap command stream (decoded from `commanddata_lgx2.cpp`)
+
+The bootstrap string is a **replayed USB capture of the Windows driver**, not a
+hand-written init table: ~9,900 commands covering chip init *plus* the
+driver's subsequent interrupt/status polling (e.g. the ADV7604 IO-map
+interrupt registers 0x44–0x82 are read-and-cleared ~50 times). A few reads even
+carry the sniffed response inline (`<13,"0008…"`, which `std::stoi` ignores).
+
+### Wire format (USB→I2C bridge on bulk OUT 0x01 / IN)
+
+Tokens: `>hex` = bulk OUT write of those bytes; `<N` = bulk IN read of N bytes.
+Addresses are **7-bit I2C**.
+
+| Bytes | Meaning |
+|---|---|
+| `01 AA LL RR.. DD..` | I2C write: slave `AA`, `LL`-byte register address `RR`, then data (auto-increment; up to 32 bytes seen) |
+| `02 AA LL NN RR..` + `<NN` | I2C read: `NN` bytes from register `RR` of slave `AA` |
+| `0E 02 07 FE 02 00` + `<512` | Non-I2C bridge command, first in the stream; reads 512 bytes (meaning unknown — device/firmware info?) |
+| `14` | Non-I2C bridge command, single byte, issued once mid-stream (cmd #7732, right after the passthrough chip's TX blocks are reconfigured). Unknown — candidate for "start/arm video path" |
+
+(The GC550 stream in `commanddata_lgx.cpp` uses additional opcodes `05`–`08`,
+not decoded.)
+
+### I2C devices addressed
+
+| 7-bit addr | Device | Evidence |
+|---|---|---|
+| `0x74` | PCA9539A GPIO expander | regs 2/3 output, 6/7 config; output 0x02 toggled `71→31→71` = **reset pulse** (bit 6) to a chip |
+| `0x20` | ADV7604 IO map | writes IO 0xF3–0xFE = sub-map addresses (8-bit form): AVLINK 0x84, CEC 0x80, INFOFRAME 0x7C, ESDP 0x70, DPP 0x78, AFE 0x4C, REP 0x64, EDID 0x6C, HDMI 0x68, TEST 0x52, CP 0x44, VDP 0x48 |
+| `0x22 / 0x26 / 0x32 / 0x34 / 0x36 / 0x3E` | ADV7604 CP / AFE / Repeater(KSV) / HDMI / EDID / InfoFrame maps | as programmed above (8-bit ÷ 2) |
+| `0x2C` | Master of an ITE-style HDMI 2.0 front-end (4K passthrough) | regs 00–03 read as vendor/device ID, reg 0x0F bank select, `FF=C3,A5` unlock; programs sub-addresses: `F0=B1` → enables `0x58`, `F1=97` → enables `0x4B` |
+| `0x58` | Its HDMI RX block | `4B=D9` → maps EDID SRAM at `0x6C` (0xD8 ÷ 2, bit 0 = enable) |
+| `0x4B` | Its TX/router block | `2C..2F = 89 8B 8D 8F` → enables four TX blocks at `0x44–0x47` |
+| `0x44–0x47` | Four TX/port blocks | `0x44/0x47` and `0x45/0x46` receive identical config sequences in pairs |
+| `0x6C` | Front-end EDID SRAM | receives the 4K EDID (below); bytes 0x7F/0xFF (checksums) are not written — the chip computes them |
+| `0x10` | Probably the Lattice ECP3 FPGA (`CLFE3::*`, "FPGA version = 0x%02X") | reg 00 read first, then small config |
+| `0x65` | Unknown (possibly `CVX8897`) | only `94=6D` and `18=04 01 20 23 8C`, twice |
+
+The exact front-end part number is not identified (an ITE IT666x-family 1→N
+HDMI 2.0 splitter with down-scaler fits the topology — unconfirmed).
+
+### Sequence overview
+
+1. `0E` bridge query; `0x65` setup; PCA9539A reset pulse.
+2. ADV7604 map-address setup → **EDID #1** written to ADV EDID RAM, then
+   ADI's eval default **EDID #2** (from the ADI reference `HardwareInit`), then
+   reset + map setup + EDID #1 again; HPD / termination via repeater map.
+3. ADV7604 mode: IO `00=02` (VID_STD), `01=06` (PRIM_MODE = HDMI-graphics,
+   V_FREQ 60 Hz), `02=F8/FC` (input colour-space auto, output config),
+   `03=80` (output bus format), `05=2C` (incl. AV-code insertion — the SAV/EAV
+   codes that become the stream markers), `06=A0`, `15=A0` (pixel/sync
+   outputs un-tristated), plus CP picture adjust (`3A–3E`).
+4. FPGA (`0x10`) and HDMI 2.0 front-end (`0x2C/0x58/0x4B/0x44–47`) init,
+   **EDID #3** (4K) to `0x6C`, TX blocks configured, `14` bridge command.
+5. Remainder (from cmd ~2,400 on): the driver's **periodic status polling**,
+   see "Runtime polling" below. Replaying it once at startup is a frozen
+   snapshot of a loop, not initialisation.
+
+### EDIDs written
+
+| # | Target | Mfg / name | Preferred timing | Notes |
+|---|---|---|---|---|
+| 1 | ADV7604 (`0x36`) | `AVX` / "AVER GC551", 2018 | 1920×1080p60 (148.5 MHz) | CEA SVDs: *1080p60, 1080p50, 1080i60/50, 720p60/50, 480p, 576p, 480i, 1080p24/25/30, 640×480; audio LPCM 2ch |
+| 2 | ADV7604 (`0x36`) | `ATV` / "ADI HDMI TV", 2010 | 720×480p | ADI reference default, immediately overwritten by #1 |
+| 3 | Front-end (`0x6C`) | `AVX` / "AVER GC551", serial "5VXF413" | **3840×2160p60 (594 MHz)** | HDMI Forum VSDB (`D8 5D C4`), 4K60 + 1080p60 etc. — this is the EDID the HDMI **source** sees |
+
+**Resolution is not requested — it is advertised.** No explicit timing
+registers (1920/1080/2200/1125) are programmed anywhere; the source picks a
+mode from the EDID (preferred 1080p60 on the capture side), the ADV7604
+auto-detects it in HDMI mode, and the driver reads the result back
+(HdmiSyncInfo / CP measurement registers). The `CVX8897::REG_*_To_*` tables
+(60p→30p etc.) are not exercised in this capture.
+
+### Runtime polling (driver-verified)
+
+Yes, the Windows driver keeps a side channel busy for its whole lifetime. It
+does **not** use a USB interrupt endpoint (none is referenced; the ADV7604's
+INT pin is not visible over USB as far as we know). Every status check is a
+host-initiated I2C register read/write on the same bridge (bulk OUT 0x01 /
+bulk IN 0x01), interleaved with the video stream on IN 0x83. Each chip
+class runs its own kernel thread woken by a periodic `KeSetTimerEx`:
+
+| Thread / class | Timer | Per tick |
+|---|---|---|
+| `CRXADV7604::ThreadProc` (`FUN_140038b40`, started by `StartTimer` `FUN_140037548` from `PowerChipSel`) | first at 500 ms, then **every 200 ms** | AVI InfoFrame read (`FUN_140036438`: InfoFrame map 0xE0–0xE2 + 0x00–0x1B, 31 reads) → `ADIAPI_TvMain` → `ADIAPI_TvIsr` (+ `ADIAPI_TvTask` if ≥20 ms since the last one, so in practice every tick) → reads the `HDCPHandshake` registry setting |
+| Front-end class, vtable `0x1400f97a0` (`FUN_140091090` → `FUN_14009167c`) | first at 50 ms, then **every 50 ms** | walks 4 port blocks (`FUN_14008c8dc` ×4 = TX blocks `0x44–0x47`); 0x58 RX status |
+| Class with vtable `0x1400fa140` (`FUN_1400920d8` → `FUN_1400930dc`) | first at 500 ms, then every **1000 ms** | not decoded (the constructor stores `0x2C`/`0x58`-like address bytes) |
+| Class with vtable `0x1400f44d0` (`FUN_1400728cc` → `FUN_1400740c8`) | first at 500 ms, then every **1000 ms** | not decoded |
+| `FUN_140017c70` thread, started when the video pin starts | 1 s wait loop | toggles an in-memory flag only (LED/indicator state); no I/O seen |
+
+There are also two 50 ms periodic timers (`FUN_14002310c`, context
++0x758/+0x798) armed when the video pin starts; what waits on them was not
+traced (probably host-side frame pacing, e.g. for the synthesised no-signal
+frames — unverified).
+
+**Measured in the sniff** (52 ADV ticks): ~115 I2C transactions per 200 ms
+in steady state (≈ **575/s**, each one or two bulk transfers). Per tick on
+average: front-end RX `0x58` 34 reads + 4 writes (≈4 polls per ADV tick,
+which fits the 50 ms timer), ADV InfoFrame 30, ADV IO 20 reads + 9 writes,
+ADV HDMI 9, ADV CP 6.5, `0x2C` 4, TX blocks `0x45/0x46` ~5 each, FPGA `0x10`
+~1.
+
+**What the ADV7604 poll checks** — it matches the ADI reference ISR and the
+Linux `adv7604.c` detect logic register for register:
+
+| Register(s) | Meaning (ADV7604) |
+|---|---|
+| IO 0x60 / 0x65 / 0x6A / 0x6F (raw status), clears at 0x62/0x67/0x6C/0x71, 0x76/0x7B/0x80 | HDMI-level raw status + interrupt clears. **0x6F bit 4 = +5V cable detect, port A** ("is something plugged in"); **0x6A = TMDS clock detect / TMDS PLL lock** |
+| IO 0x43 / 0x5C, clears at 0x44 / 0x5D | Interrupt status groups 1 and 2 (`NEW_VIDEO_DETECTED`, `NEW_5V_DETECTED`, … events seen as driver strings) |
+| IO 0x12 bit 0, CP 0xB5 (`&0xD0`), CP 0xB1 bit 7 | CP lock / SSPD lock / STDI valid: Linux's `no_lock_cp` / `no_lock_sspd` / `no_lock_stdi`. Together these are the "**is there a usable signal**" test |
+| CP 0xB1–0xB4 (n=2 reads) | STDI block length / lines per field: the **resolution and frame-rate measurement** (`CheckTheFrameRate Blines`) |
+| HDMI 0x00, 0x04, 0x05, 0x18, 0x5B–0x5D, 0x36 (n=5) | HDMI port / TMDS / mode status, measured timing and TMDS frequency |
+| InfoFrame map 0x00–0x1B, 0xE0–0xE2 | AVI InfoFrame (colour space, VIC) checked for changes |
+
+On a detected change, `ADIAPI_TvTask` reconfigures the receiver ("The Rx has
+been reconfigured for the detected Resolution", `AssertHpdAndTerm`,
+`ConfigureAAFilters`, `ConfigureDriveStrength`) and the front-end thread
+handles the passthrough ports.
+
+**Userspace status poll.** `UsbStream` now runs a read-only 200 ms poll
+(`statusPollLoop`, GC551 only, disable with `LGX2_NO_STATUS_POLL`). It reads IO
+0x0C/0x12/0x6A/0x6F, CP 0xB1, HDMI 0x05–0x0C, 0x20–0x25, 0x2A–0x35 and 0x3B
+(9 bridge reads, block reads ≤ 13 bytes), decodes them with `SignalStatus`
+(Linux `no_signal()` + `query_dv_timings` logic) and prints a line when the
+cable, signal or timing changes. It writes nothing, so it cannot clear
+interrupts or reconfigure anything — it observes only. First hardware
+testing: command reads issued right after bootstrap time out, and video
+takes ~3–5 s to start flowing properly, so the first poll was briefly delayed
+10 s. With a 100 ms per-transfer timeout every poll still timed out after
+that delay. The real cause was the truncated bootstrap capture (below), and
+the delay was removed once that was fixed.
+
+**How the driver sends runtime commands (driver-verified).** The bridge
+command dispatcher `FUN_1400199cc` accepts opcodes
+`01–10, 14, 15, 16, 29, 2A`. Under a mutex it does a synchronous bulk OUT of
+the request on one pipe and then a synchronous bulk IN of the reply on
+another, both via `FUN_14001720c` (URB function 0x09, bulk/interrupt). That
+is the same request format and endpoints as the bootstrap, so there is no
+separate runtime channel and no vendor control requests. Each transfer is
+submitted through `FUN_1400157c4`, which waits **up to 5 s**
+(`KeWaitForSingleObject` timeout −50,000,000 × 100 ns) before cancelling.
+Error recovery aborts the pipe (URB function 0x02, `FUN_14001458c`). The
+userspace poll now uses the same 5 s timeout and reports how long each poll
+took.
+
+**Truncated bootstrap capture (hardware-verified).** The LGX2 command string
+ends with a read request (`>02220102A8`, 2 bytes from CP 0xA8) and no `<2`
+after it, because the sniff was cut off mid-transaction. Its 2-byte reply
+stays queued in IN 0x81, and the next command read gets it instead of its
+own answer. A 1-byte read then failed with `LIBUSB_ERROR_OVERFLOW` (seen on
+hardware). On Linux this probably left the endpoint unusable, which matches
+every later poll timing out. Fix: drain IN 0x81 after the bootstrap replay,
+and always receive command replies into a full 1024-byte (wMaxPacketSize)
+buffer and check the length in software. The GC550 string ends with a proper
+`<2` read.
+
+**Verified on hardware after the fix:** the read before streaming succeeds
+("cable connected, no signal", 6 ms). Mid-stream polls also succeed, with a
+**full 9-read poll taking ~6 ms while video streams** on IN 0x83, and they
+report `1920x1080p @ 59.90 Hz (148.25 MHz, HDMI)`. So the bridge answers
+promptly while streaming. The earlier timeouts came from the stale reply,
+not from streaming. (59.90 rather than 60.00 Hz is the TMDS frequency
+register's 0.25 MHz resolution: 148.25 MHz / (2200 × 1125) = 59.90.) Source
+unplug/replug is detected and reported correctly. The poll now starts
+immediately when streaming starts, with no delay.
+
+**Endpoints (device descriptor + driver pipe mapping).** The GC551 has one
+configuration with one vendor-specific interface and six bulk endpoints, in
+this pipe order: 0 = `0x01` OUT, 1 = `0x81` IN, 2 = `0x02` OUT, 3 = `0x82` IN
+(bMaxBurst 15), 4 = `0x03` OUT, 5 = `0x83` IN (bMaxBurst 15). On a
+single-interface device the driver's channel setup (`FUN_1400196e0`) sets
+command OUT = pipe 0 (`0x01`), command IN = pipe 1 (`0x81`) and stream =
+pipe 5 (`0x83`). So runtime commands use the **same endpoint pair as the
+bootstrap**. The EP2 pair is not used by this path (another branch, for
+devices with a second interface, uses pipes 0/3).
+
+**Implication for userspace.** `UsbStream::streamSetupCommands` replays the
+whole capture once, polling included, and then sends nothing. That is enough
+for a source that is already connected and stays at one mode (the tested
+case). With no loop running, nothing re-asserts HPD or reconfigures the
+ADV7604 or front-end on hot-plug or a mode change. That *may* explain
+hot-plug and "already bootstrapped" failures (untested). Replicating it
+needs a command channel that is safe to use while the IN 0x83 stream is
+running, plus a ~200 ms poll that reads at minimum IO 0x6F, IO 0x6A, IO 0x12,
+CP 0xB1/0xB5 and the HDMI timing registers.
 
 ---
 

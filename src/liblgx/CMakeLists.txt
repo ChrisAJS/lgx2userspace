@@ -48,3 +48,7 @@ add_executable(framebuilder_test test/FrameBuilder.t.cpp test/catch_amalgamated.
 target_include_directories(framebuilder_test PRIVATE src)
 target_link_libraries(framebuilder_test PRIVATE liblgx)
 add_test(framebuilder_test framebuilder_test)
+
+add_executable(signalstatus_test test/SignalStatus.t.cpp test/catch_amalgamated.cpp test/catch_amalgamated.hpp)
+target_link_libraries(signalstatus_test PRIVATE liblgx)
+add_test(signalstatus_test signalstatus_test)

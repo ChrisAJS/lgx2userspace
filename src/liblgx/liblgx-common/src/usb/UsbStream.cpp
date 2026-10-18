@@ -146,6 +146,7 @@ namespace libusb {
     }
 
     void UsbStream::streamSetupCommands(lgx2::DeviceType deviceType) {
+        _deviceType = deviceType;
         std::string targetCommands;
         if (deviceType == lgx2::DeviceType::LGX2) {
             _dev = libusb_open_device_with_vid_pid(nullptr, 0x07ca, 0x0551);
@@ -207,6 +208,15 @@ namespace libusb {
         }
 
         printf("Bootstrapping complete\n");
+
+        // The LGX2 command capture was cut off mid-transaction: it ends with a read request
+        // (>02220102A8) whose 2-byte reply is never read. Collect it now, otherwise it sits in
+        // IN 0x81 and is returned as the answer to the next command read.
+        drainCommandResponses();
+
+        if (deviceType == lgx2::DeviceType::LGX2 && std::getenv("LGX2_NO_STATUS_POLL") == nullptr) {
+            probeStatusBeforeStreaming();
+        }
     }
 
     void UsbStream::queueFrameRead(std::function<void(uint8_t *, uint32_t, bool)> *onData) {
@@ -222,6 +232,138 @@ namespace libusb {
         libusb_submit_transfer(_probeTransfer);
 
         _readThread = std::thread(&UsbStream::readLoop, this);
+
+        // The register map is ADV7604-specific, which only the GC551 has.
+        if (_deviceType == lgx2::DeviceType::LGX2) {
+            if (std::getenv("LGX2_NO_STATUS_POLL") == nullptr) {
+                _statusThread = std::thread(&UsbStream::statusPollLoop, this);
+            } else {
+                printf("HDMI input status poll disabled (LGX2_NO_STATUS_POLL)\n");
+            }
+        }
+    }
+
+    void UsbStream::statusPollLoop() {
+        lgx2::SignalStatus lastStatus;
+        bool haveStatus = false;
+        int consecutiveFailures = 0;
+
+        std::unique_lock<std::mutex> lock(_statusMutex);
+        while (!_shuttingDown) {
+            lock.unlock();
+
+            lgx2::AdvStatusRegisters regs;
+            auto pollStart = std::chrono::steady_clock::now();
+            int res = readAdvStatus(regs);
+            auto pollMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - pollStart).count();
+            if (res == LIBUSB_ERROR_NO_DEVICE) {
+                // The stream's own transfers report the disconnect.
+                return;
+            }
+
+            if (res != LIBUSB_SUCCESS) {
+                if (_shuttingDown) return;
+                // A request may have been answered late: flush it so the next reply is not
+                // attributed to the wrong register.
+                drainCommandResponses();
+                if (++consecutiveFailures == STATUS_MAX_CONSECUTIVE_FAILURES) {
+                    fprintf(stderr, "HDMI input status poll failed %d times in a row (%s on %s, last attempt %lld ms) — stopping the poll\n",
+                            consecutiveFailures, libusb_error_name(res), _lastCommandFailure,
+                            static_cast<long long>(pollMs));
+                    return;
+                }
+            } else {
+                consecutiveFailures = 0;
+                lgx2::SignalStatus status = lgx2::SignalStatus::decode(regs);
+                if (!haveStatus || status != lastStatus) {
+                    // The poll duration shows how slowly the bridge answers mid-stream.
+                    printf("HDMI input: %s (status poll took %lld ms)\n", status.describe().c_str(),
+                           static_cast<long long>(pollMs));
+                    lastStatus = status;
+                    haveStatus = true;
+                }
+            }
+
+            lock.lock();
+            _statusWake.wait_for(lock, STATUS_POLL_INTERVAL, [this] { return _shuttingDown.load(); });
+        }
+    }
+
+    int UsbStream::readAdvStatus(lgx2::AdvStatusRegisters &regs) {
+        // 7-bit I2C addresses of the ADV7604 maps, as programmed by the bootstrap.
+        constexpr uint8_t ADV_IO = 0x20;
+        constexpr uint8_t ADV_CP = 0x22;
+        constexpr uint8_t ADV_HDMI = 0x34;
+
+        int res;
+        if ((res = i2cRead(ADV_IO, 0x0C, &regs.io0c, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_IO, 0x12, &regs.io12, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_IO, 0x6A, &regs.io6a, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_IO, 0x6F, &regs.io6f, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_CP, 0xB1, &regs.cpB1, 1)) != LIBUSB_SUCCESS) return res;
+        // Block reads stay at or below 13 bytes, the largest read seen in the bootstrap capture.
+        if ((res = i2cRead(ADV_HDMI, 0x05, regs.hdmi05to0c, sizeof(regs.hdmi05to0c))) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_HDMI, 0x20, regs.hdmi20to25, sizeof(regs.hdmi20to25))) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_HDMI, 0x2A, regs.hdmi2ato35, sizeof(regs.hdmi2ato35))) != LIBUSB_SUCCESS) return res;
+        return i2cRead(ADV_HDMI, 0x3B, &regs.hdmi3b, 1);
+    }
+
+    int UsbStream::i2cRead(uint8_t address, uint8_t reg, uint8_t *out, uint8_t count) {
+        // Bridge read request: 02 <addr> <reg addr length=1> <count> <reg>, answered by
+        // exactly <count> bytes on bulk IN 0x01 (see PROTOCOL.md, "Bootstrap command stream").
+        uint8_t request[] = {0x02, address, 0x01, count, reg};
+        int actualLength = 0;
+
+        _lastCommandFailure = "request (OUT 0x01)";
+        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, request, sizeof(request),
+                                       &actualLength, COMMAND_TIMEOUT_MS);
+        if (res != LIBUSB_SUCCESS) return res;
+        if (actualLength != static_cast<int>(sizeof(request))) return LIBUSB_ERROR_IO;
+
+        // Receive into a full max-packet buffer: asking for exactly <count> bytes turns a stale or
+        // unexpected reply into LIBUSB_ERROR_OVERFLOW, which can leave the endpoint unusable.
+        _lastCommandFailure = "reply (IN 0x81)";
+        uint8_t reply[COMMAND_MAX_PACKET];
+        res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x01, reply, sizeof(reply), &actualLength,
+                                   COMMAND_TIMEOUT_MS);
+        if (res == LIBUSB_ERROR_PIPE) {
+            libusb_clear_halt(_dev, LIBUSB_ENDPOINT_IN | 0x01);
+        }
+        if (res != LIBUSB_SUCCESS) return res;
+        if (actualLength != count) {
+            _lastCommandFailure = "reply (IN 0x81, unexpected length)";
+            return LIBUSB_ERROR_IO;
+        }
+        memcpy(out, reply, count);
+        return LIBUSB_SUCCESS;
+    }
+
+    void UsbStream::probeStatusBeforeStreaming() {
+        // Diagnostic: the bootstrap's own reads succeed before the IN 0x83 stream starts, so a
+        // status read here tells apart "request format wrong" from "bridge does not answer
+        // while streaming" when the periodic poll fails.
+        lgx2::AdvStatusRegisters regs;
+        auto start = std::chrono::steady_clock::now();
+        int res = readAdvStatus(regs);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start).count();
+        if (res == LIBUSB_SUCCESS) {
+            printf("HDMI input (before streaming): %s (status read took %lld ms)\n",
+                   lgx2::SignalStatus::decode(regs).describe().c_str(), static_cast<long long>(ms));
+        } else {
+            fprintf(stderr, "HDMI input status read before streaming failed: %s on %s after %lld ms\n",
+                    libusb_error_name(res), _lastCommandFailure, static_cast<long long>(ms));
+            drainCommandResponses();
+        }
+    }
+
+    void UsbStream::drainCommandResponses() {
+        uint8_t discard[COMMAND_MAX_PACKET];
+        int actualLength = 0;
+        while (libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x01, discard, sizeof(discard), &actualLength, 10) ==
+               LIBUSB_SUCCESS) {
+        }
     }
 
     void UsbStream::update() {
@@ -307,6 +449,14 @@ namespace libusb {
 
     void UsbStream::shutdownStream() {
         _shuttingDown = true;
+        {
+            // Taking the lock orders the flag store before the poll thread's predicate check.
+            std::lock_guard<std::mutex> lock(_statusMutex);
+        }
+        _statusWake.notify_all();
+        if (_statusThread.joinable()) {
+            _statusThread.join();
+        }
         _readThread.join();
 
         if (_dumpFile != nullptr) {

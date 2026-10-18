@@ -74,6 +74,13 @@ cmake -S . -B build -DLGX2_VERBOSE_STATS=ON
 cmake --build build
 ```
 
+### Runtime environment variables
+
+| Variable | Description |
+|---|---|
+| `LGX2_NO_STATUS_POLL` | Set to any value to disable the HDMI input status poll. By default the LGX2 (GC551) is polled every 200 ms and changes are printed, e.g. `HDMI input: 1920x1080p @ 60.00 Hz (148.50 MHz, HDMI)` or `HDMI input: no cable`. |
+| `LGX2_DUMP_FILE` | Path to write the first 128 raw USB chunks to, for offline stream analysis. |
+
 ## Setup
 The userspace driver will require read and write access to the LGX/LGX2. 
 
