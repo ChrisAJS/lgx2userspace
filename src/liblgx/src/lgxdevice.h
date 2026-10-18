@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <chrono>
+#include "BufferReorderer.h"
 #include "FrameBuilder.h"
 
 namespace lgx2 {
@@ -107,7 +108,9 @@ namespace lgx2 {
         Logger *_logger;
         ErrorSink *_errorSink;
 
+        utils::BufferReorderer _bufferReorderer;
         utils::FrameBuilder _frameBuilder;
+        uint32_t _reportedOrderChanges{0};
 
         std::function<void(uint8_t *, uint32_t, bool)> _onFrameData;
 

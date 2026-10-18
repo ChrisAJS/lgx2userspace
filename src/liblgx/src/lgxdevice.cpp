@@ -13,6 +13,9 @@ namespace lgx2 {
             onFrameData(frameData, length, gapped);
         };
 
+        _bufferReorderer.setSink([this](uint8_t *data, uint32_t length, bool gapped) {
+            _frameBuilder.feed(data, length, gapped);
+        });
         _frameBuilder.setVideoFrameCallback([this](const uint8_t *data, uint32_t byteLength) {
             produceVideoData(byteLength, data);
         });
@@ -55,10 +58,17 @@ namespace lgx2 {
     }
 
     void Device::onFrameData(uint8_t *data, uint32_t length, bool gapped) {
-        // All marker detection, header validation and frame/audio assembly lives in the
-        // FrameBuilder state machine. A gap flags a lost region: it resets parser state
-        // and requires a clean SAV->EAV pair before frames are emitted again.
-        _frameBuilder.feed(data, length, gapped);
+        // The BufferReorderer first restores the device's 16 KiB DMA buffer order (pairs can arrive
+        // swapped after an unclean stop), then hands the stream to the FrameBuilder state machine,
+        // which does all marker detection, header validation and frame/audio assembly. A gap flags
+        // a lost region: both re-sync, and a clean SAV->EAV pair is required before frames resume.
+        _bufferReorderer.feed(data, length, gapped);
+
+        if (_bufferReorderer.orderChanges() != _reportedOrderChanges) {
+            _reportedOrderChanges = _bufferReorderer.orderChanges();
+            printf("USB buffer order: %s\n", _bufferReorderer.order() == utils::BufferReorderer::Order::Swapped
+                                             ? "swapped pairs (re-ordering)" : "normal");
+        }
     }
 
     void Device::produceVideoData(uint32_t, const uint8_t *data) {

@@ -547,6 +547,107 @@ register's 0.25 MHz resolution: 148.25 MHz / (2200 × 1125) = 59.90.) Source
 unplug/replug is detected and reported correctly. The poll now starts
 immediately when streaming starts, with no delay.
 
+**Other bridge opcodes (driver-verified senders).** `0E a b c Lh Ll`
+reads `Lh·256+Ll` bytes from a memory address. The bootstrap's
+`0E 02 07 FE 02 00` reads 512 bytes, probably board/config EEPROM (the
+driver later tests capability bits in a 0x20-byte config block). `0D` is
+the matching write, and `15`/`16` are single-byte variants of `0D`/`0E`.
+`05`/`06`/`07` (GC550 only) are a 1-byte-prefixed write / read / write with
+8 ms stalls. `09 x` and `0B a b c` are short writes. `08` and `14` take no
+arguments and are reached only through a virtual method table, so their
+meaning is not yet traced.
+
+**Detecting an already-bootstrapped board (userspace).** The configuration
+survives a USB reset (including the `libusb_reset_device` at shutdown) and is
+only lost on unplug. Re-running the bootstrap on a configured board is what
+produced garbage output. The bootstrap sets the PCA9539A (0x74)
+configuration registers 0x06/0x07 to `00 09`. Their power-on default is
+`FF FF` (all inputs), and the expander is bus-powered, so a USB reset leaves
+it alone. `UsbStream::detectLgx2BoardState` reads them before bootstrapping:
+- `FF FF` means fresh, so run the bootstrap.
+- `00 09` plus ADV7604 IO 0xFA (EDID map address) = `0x6C` means already
+  configured. Skip the bootstrap, skip the frame-boundary probe, and let the
+  FrameBuilder re-sync mid-stream.
+- Anything else, or a failed read, falls back to the old IN 0x83 data check
+  and its error message.
+
+**Hardware result: reuse works intermittently.** In one test the first reuse
+after a clean session gave good video. The next reuse gave **audio but no
+video**, and neither an HDMI replug nor an app restart fixed it (a restart
+takes the reuse path again). Two dumps of that state show every byte is
+present, in the wrong order.
+
+### Swapped DMA buffer order (hardware-verified)
+
+The stream arrives as **16 KiB FX3 DMA buffers**. A frame period at 1080p is
+exactly **254 buffers** (4,161,536 bytes):
+- SAV (8 bytes, always at the start of a buffer)
+- 4,147,200 bytes of video
+- EAV (9 bytes, padded to 12)
+- the 3,200-byte audio packet
+- **11,108 bytes of `AA 55 55 AA` filler up to the buffer boundary**
+
+That last item corrects an earlier belief: `AA 55 55 AA` is padding after the
+audio payload, not an audio end marker.
+
+In the bad state, **every pair of buffers arrives swapped**, on a 32 KiB grid.
+One likely mechanism: the buffers alternate between two producers
+(ping-pong), and a buffer lost when a previous session stopped flips the
+consumer's phase. That fits the state persisting until power-off, and only
+some sessions ending in it. To the parser it looks like this:
+
+```
+SAV(N)                   first buffer of a swapped pair
+  18,432 B               = 16,376 B of frame N's start + 2,056 B of frame N-1's end
+EAV(N-1) + audio + filler
+  4,128,768 B            frame N, still pair-swapped
+SAV(N+1) …
+```
+
+Every SAV→EAV span is 18,432 bytes, so the size gate rejects every frame
+while audio still parses (audio-only). EAV c0 ≠ SAV b0 because the EAV
+belongs to the previous frame. The EAV header's c2..c3 = `04 38` is 1080
+lines. The frame counter (b0/c0) runs `… fe ff 01 …` and skips `00`.
+
+Evidence:
+- An image-smoothness search over reorderings picked "swap 16 KiB pairs":
+  mean vertical luma step 0.79 vs 3.60 as delivered, with no other candidate
+  close.
+- Un-swapping every pair on a grid aligned to the stream start turns all 63
+  SAV→EAV spans into exactly 4,147,200 bytes with c0 == b0, and the frames
+  render cleanly.
+- A first attempt that reassembled frames around the "late" EAV instead
+  produced ghosted, striped images (two offset copies). It was reverted.
+
+No "resync" command is known; `08`/`14` are still unidentified.
+
+**Fix: `utils::BufferReorderer`, in front of the FrameBuilder.**
+- It scans the raw stream for SAVs. A checksum-valid EAV for an earlier frame
+  (c0 ≠ b0) within 32 KiB after a SAV means "swapped, pair grid anchored at
+  this SAV"; none means normal.
+- In swapped mode it emits each 32 KiB pair second-half-first; normal mode
+  passes data through.
+- It holds back about 32 KiB so each SAV's verdict is known before its bytes
+  are emitted, and drops data before the first decided SAV.
+- A gap re-detects the order. Once an order is established, changing it needs
+  two consecutive agreeing SAVs, so a SAV-like pattern inside audio data
+  cannot flip it. Output after any change is flagged gapped so the
+  FrameBuilder re-syncs.
+- It assumes an even number of buffers per frame period (true at 1080p);
+  other resolutions are untested.
+
+Verified offline:
+- The swapped dump through BufferReorderer + FrameBuilder gives 61/61 frames
+  byte-identical to the independently un-swapped stream. The first frames
+  are lost while the order is decided; the capture's first SAV looks normal.
+- The normal-order stream gives 63/63 identical, so it passes through
+  unchanged.
+- Unit tests cover normal, swapped, a gap, a mid-stream change, the counter
+  wrap, a fake SAV in audio, and a swapped 1080p stream through the
+  FrameBuilder.
+
+Not yet confirmed on hardware with a live cold-start (normal) stream.
+
 **Endpoints (device descriptor + driver pipe mapping).** The GC551 has one
 configuration with one vendor-specific interface and six bulk endpoints, in
 this pipe order: 0 = `0x01` OUT, 1 = `0x81` IN, 2 = `0x02` OUT, 3 = `0x82` IN
