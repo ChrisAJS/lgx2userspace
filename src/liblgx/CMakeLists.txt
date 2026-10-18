@@ -9,8 +9,13 @@ cmake_minimum_required(VERSION 3.18)
 
 set(LIBLGX_CORE_SOURCES
         src/liblgx.h
+        src/lgxinterfaces.h
         src/lgxdevice.cpp
         src/lgxdevice.h
+        src/CapturePipeline.cpp
+        src/CapturePipeline.h
+        src/NoSignalCard.cpp
+        src/NoSignalCard.h
         src/FrameBuilder.cpp
         src/FrameBuilder.h
         src/BufferReorderer.cpp
@@ -83,3 +88,7 @@ add_test(bufferreorderer_test bufferreorderer_test)
 add_executable(audiogate_test test/AudioGate.t.cpp test/catch_amalgamated.cpp test/catch_amalgamated.hpp)
 target_link_libraries(audiogate_test PRIVATE liblgx-core)
 add_test(audiogate_test audiogate_test)
+
+add_executable(capturepipeline_test test/CapturePipeline.t.cpp test/catch_amalgamated.cpp test/catch_amalgamated.hpp)
+target_link_libraries(capturepipeline_test PRIVATE liblgx-core)
+add_test(capturepipeline_test capturepipeline_test)
