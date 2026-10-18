@@ -20,7 +20,7 @@ namespace lgx2d {
             bool statusPoll{true};
         };
 
-        CaptureDaemon(lgx2::VideoOutput *video, Options options);
+        CaptureDaemon(lgx2::VideoOutput *video, lgx2::AudioOutput *audio, Options options);
         ~CaptureDaemon();
 
         // Runs until `stop` becomes true.

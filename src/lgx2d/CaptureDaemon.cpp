@@ -14,8 +14,8 @@ namespace lgx2d {
         }
     }
 
-    CaptureDaemon::CaptureDaemon(lgx2::VideoOutput *video, Options options)
-            : _options{options}, _pipeline{video, nullptr, pipelineOptions()} {
+    CaptureDaemon::CaptureDaemon(lgx2::VideoOutput *video, lgx2::AudioOutput *audio, Options options)
+            : _options{options}, _pipeline{video, audio, pipelineOptions()} {
     }
 
     CaptureDaemon::~CaptureDaemon() {

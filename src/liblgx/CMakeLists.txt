@@ -58,6 +58,15 @@ if (CMAKE_SYSTEM MATCHES Linux)
     message("Detected Linux system")
     add_subdirectory(liblgx-linux)
     target_link_libraries(liblgx INTERFACE liblgx-linux)
+
+    # Optional: PipeWire audio source for lgx2d.
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PIPEWIRE IMPORTED_TARGET libpipewire-0.3)
+    if (PIPEWIRE_FOUND)
+        add_subdirectory(liblgx-pipewire)
+    else()
+        message("libpipewire-0.3 not found: lgx2d will be built without audio output")
+    endif()
 endif()
 
 if (CMAKE_SYSTEM MATCHES Darwin)

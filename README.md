@@ -29,25 +29,26 @@ To build the project, you will need:
 * libusb
 * SDL3
 * V4L2Loopback
+* PipeWire development files (optional: audio output from `lgx2d`)
 
 ### Ubuntu 24.04+
 The following packages need to be installed:
 
 ```bash
-sudo apt install cmake libusb-1.0-0-dev libsdl3-dev v4l2loopback-dkms v4l2loopback-utils
+sudo apt install cmake libusb-1.0-0-dev libsdl3-dev v4l2loopback-dkms v4l2loopback-utils libpipewire-0.3-dev
 ```
 ### Arch Linux
 The following packages need to be installed:
 
 ```bash
-sudo pacman -S cmake libusb sdl3 v4l2loopback-dkms v4l2loopback-utils
+sudo pacman -S cmake libusb sdl3 v4l2loopback-dkms v4l2loopback-utils pipewire
 ```
 
 ### Fedora
 The following packages need to be installed:
 
 ```bash
-sudo dnf install cmake libusb1-devel SDL3-devel v4l2loopback
+sudo dnf install cmake libusb1-devel SDL3-devel v4l2loopback pipewire-devel
 ```
 
 ### Build Command
@@ -163,7 +164,12 @@ producing frames.
 ./src/lgx2d/lgx2d -d /dev/video99
 ```
 
-Stop it with Ctrl+C. Audio is not yet output by the daemon.
+Audio is published as a PipeWire source called **LGX2 Audio**: in OBS add an *Audio Input
+Capture (PipeWire)* source and select it. Several applications can record from it at once. It
+is muted while there is no signal. Pass `-A` to disable audio, or build without PipeWire
+development files installed to leave it out entirely.
+
+Stop it with Ctrl+C.
 
 ### Running with a V4L2 device
 Run the userspace driver with the `-d` option to specify which V4L2Loopback device to use:
