@@ -2,18 +2,20 @@
 #define LGX2USERSPACE_CAPTURESTREAM_H
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <functional>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 #include <libusb-1.0/libusb.h>
 
 namespace libusb {
     // The video/audio stream on bulk IN 0x83. A pool of asynchronous transfers is kept in flight
-    // by a dedicated thread, and completed chunks go into a bounded queue that the consumer drains
-    // with deliver(), so reads never wait on the consumer (see PROTOCOL.md, "Stall & desync").
+    // (completions run on the UsbContext's event thread), and completed chunks go into a bounded
+    // queue that the consumer drains with deliver(), so reads never wait on the consumer (see
+    // PROTOCOL.md, "Stall & desync").
     class CaptureStream {
     public:
         using ChunkCallback = std::function<void(uint8_t *data, uint32_t length, bool gapped)>;
@@ -29,12 +31,15 @@ namespace libusb {
         // the first chunk is flagged gapped so the parser re-syncs instead.
         void start(bool alignToFrameStart);
 
-        // Hand every queued chunk to the callback. Throws if the stream has failed (device
-        // disconnected, or no frame start found).
+        // Hand every queued chunk to the callback.
         void deliver(const ChunkCallback &callback);
 
-        // Cancel outstanding transfers and wait for the read thread to finish.
+        // Cancel outstanding transfers and wait until every one has completed.
         void stop();
+
+        // The stream has stopped for good (device disconnected, or no frame start found).
+        bool failed() const;
+        std::string failure() const;
 
         // Diagnostics: chunks dropped because the bounded queue was full (consumer too slow),
         // and transient transfer errors that were recovered from by marking a gap.
@@ -64,9 +69,16 @@ namespace libusb {
             bool gapped{false};
         };
 
+        // How long stop() waits for cancelled transfers to complete before giving up on them.
+        static constexpr auto STOP_TIMEOUT = std::chrono::seconds(2);
+
         libusb_device_handle *_dev;
 
+        // Transfers in flight. Guarded by _transfersMutex together with _shuttingDown, so a
+        // completion cannot resubmit a transfer after stop() has cancelled the rest.
         std::vector<libusb_transfer *> _transfers;
+        std::mutex _transfersMutex;
+        std::condition_variable _transfersDrained;
 
         // Transfer pool regions (TRANSFER_POOL_SIZE) followed by ring slot regions (RING_SLOTS).
         uint8_t *_frameBuffer;
@@ -77,6 +89,7 @@ namespace libusb {
 
         std::atomic<bool> _shuttingDown{false};
         std::atomic<bool> _hasError{false};
+        mutable std::mutex _errorMutex;
         std::string _errorMessage;
 
         // Cumulative diagnostics (updated by the read thread, read by the consumer).
@@ -86,15 +99,14 @@ namespace libusb {
         FILE *_dumpFile{nullptr};
         uint64_t _dumpCount{0};
 
-        std::thread _readThread;
         std::mutex _queueMutex;
         std::vector<uint8_t> _consumeBuffer;
 
         int _probeAttempts{0};
 
-        void readLoop();
         void dumpChunk(const uint8_t *data, uint32_t length, bool gapped);
 
+        // Resubmit a completed transfer, or free it once shutting down.
         void submitTransfer(libusb_transfer *transfer);
         void discardTransfer(libusb_transfer *transfer);
         void signalError(const char *message);
@@ -103,6 +115,8 @@ namespace libusb {
 
         void enqueueChunk(const uint8_t *data, uint32_t length, bool gapped);
         void queueAllFrameReads();
+        void addTransferLocked(libusb_transfer *transfer);
+        void removeTransferLocked(libusb_transfer *transfer);
 
         static void probeTransferComplete(libusb_transfer *transfer);
         static void usbTransferComplete(libusb_transfer *transfer);

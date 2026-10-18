@@ -19,7 +19,11 @@ set(USB_SOURCES
         src/usb/StatusMonitor.cpp
         src/usb/StatusMonitor.h
         src/usb/CaptureStream.cpp
-        src/usb/CaptureStream.h)
+        src/usb/CaptureStream.h
+        src/usb/UsbContext.cpp
+        src/usb/UsbContext.h
+        src/usb/DeviceSession.cpp
+        src/usb/DeviceSession.h)
 
 add_library(liblgx-usb STATIC ${USB_SOURCES} ${BOOTSTRAP_SOURCES})
 

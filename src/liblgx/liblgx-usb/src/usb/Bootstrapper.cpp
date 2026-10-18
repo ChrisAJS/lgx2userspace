@@ -67,30 +67,26 @@ namespace libusb {
         // A reply left over from an interrupted previous session would be read as our answer.
         _bridge.drainResponses();
 
-        // The PCA9539A GPIO expander powers up with both configuration registers at 0xFF (all
-        // inputs); the bootstrap sets them to 00/09. It is bus powered and unaffected by a USB
-        // reset, so these values identify a board that is still configured from an earlier run.
+        // The ADV7604's EDID map address (IO 0xFA) resets to 0x00 and the bootstrap sets it to
+        // 0x6C; the PCA9539A GPIO expander's configuration registers end up 00/09 after the
+        // bootstrap (the card's own firmware leaves them at 00/89 on power-up). Both are bus
+        // powered and unaffected by a USB reset, so together they identify a board that is
+        // still configured from an earlier run.
+        constexpr uint8_t ADV_IO = 0x20;
         constexpr uint8_t PCA9539A = 0x74;
-        uint8_t pcaConfig[2];
-        if (_bridge.i2cRead(PCA9539A, 0x06, pcaConfig, sizeof(pcaConfig)) != LIBUSB_SUCCESS) {
+        uint8_t edidMapAddress = 0;
+        uint8_t pcaConfig[2] = {0, 0};
+        if (_bridge.i2cRead(ADV_IO, 0xFA, &edidMapAddress, 1) != LIBUSB_SUCCESS ||
+            _bridge.i2cRead(PCA9539A, 0x06, pcaConfig, sizeof(pcaConfig)) != LIBUSB_SUCCESS) {
             _bridge.drainResponses();
             return BoardState::Unknown;
         }
-        if (pcaConfig[0] == 0xFF && pcaConfig[1] == 0xFF) {
-            return BoardState::Fresh;
-        }
 
-        // Confirm with the ADV7604, whose EDID map address (IO 0xFA) the bootstrap sets to 0x6C.
-        constexpr uint8_t ADV_IO = 0x20;
-        uint8_t edidMapAddress = 0;
-        if (pcaConfig[0] == 0x00 && pcaConfig[1] == 0x09 &&
-            _bridge.i2cRead(ADV_IO, 0xFA, &edidMapAddress, 1) == LIBUSB_SUCCESS && edidMapAddress == 0x6C) {
-            return BoardState::Configured;
-        }
+        if (edidMapAddress != 0x6C) return BoardState::Fresh;
+        if (pcaConfig[0] == 0x00 && pcaConfig[1] == 0x09) return BoardState::Configured;
 
-        _bridge.drainResponses();
-        fprintf(stderr, "Unrecognised board state (PCA9539A config %02X %02X, ADV7604 EDID map 0x%02X)\n",
-                pcaConfig[0], pcaConfig[1], edidMapAddress);
+        fprintf(stderr, "Unrecognised board state (ADV7604 EDID map 0x%02X, PCA9539A config %02X %02X)\n",
+                edidMapAddress, pcaConfig[0], pcaConfig[1]);
         return BoardState::Unknown;
     }
 

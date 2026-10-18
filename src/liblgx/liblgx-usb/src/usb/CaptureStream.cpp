@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
-#include <stdexcept>
 
 namespace libusb {
 
@@ -15,6 +14,12 @@ namespace libusb {
             // Shutdown in progress; submitTransfer below frees the transfer. Do not count a
             // cancellation as a probe attempt.
             stream->submitTransfer(transfer);
+            return;
+        }
+
+        if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE) {
+            stream->signalError("USB capture device was disconnected");
+            stream->discardTransfer(transfer);
             return;
         }
 
@@ -34,12 +39,9 @@ namespace libusb {
 
         // After a correct bootstrap the device should start at a frame boundary immediately.
         // Retrying a handful of times handles any transient buffering but if we never find
-        // the marker something is genuinely wrong — exit rather than accumulate garbage.
+        // the marker something is genuinely wrong — stop rather than accumulate garbage.
         if (!stream->recordProbeAttempt()) {
-            fprintf(stderr, "Device did not start sending at a frame boundary after multiple attempts — try replugging\n");
-            stream->signalError("No frame start found");
-            // Free and remove the probe transfer so it is not orphaned (which would prevent
-            // the read loop from ever draining _transfers and hanging shutdown).
+            stream->signalError("Device did not start sending at a frame boundary after multiple attempts — try replugging");
             stream->discardTransfer(transfer);
             return;
         }
@@ -60,9 +62,9 @@ namespace libusb {
                 // Shutdown in progress; submitTransfer below frees the transfer.
                 break;
             case LIBUSB_TRANSFER_NO_DEVICE:
-                fprintf(stderr, "USB capture device was disconnected\n");
                 stream->signalError("USB capture device was disconnected");
-                break;
+                stream->discardTransfer(transfer);
+                return;
             default:
                 // Transient error (bus reset, etc.): keep the pipeline alive and mark a gap.
                 fprintf(stderr, "USB read error during capture (status %d) — continuing\n", transfer->status);
@@ -97,12 +99,12 @@ namespace libusb {
 
     void CaptureStream::start(bool alignToFrameStart) {
         if (alignToFrameStart) {
+            std::lock_guard<std::mutex> lock(_transfersMutex);
             libusb_transfer *probe = libusb_alloc_transfer(0);
             libusb_fill_bulk_transfer(probe, _dev, LIBUSB_ENDPOINT_IN | 0x03,
                                       _frameBuffer, CHUNK_BYTES,
                                       probeTransferComplete, this, 0);
-            _transfers.push_back(probe);
-            libusb_submit_transfer(probe);
+            addTransferLocked(probe);
         } else {
             // The device is mid-stream with whatever it buffered since the last session, so the
             // first transfer will not start on a frame boundary. Skip the alignment probe and let
@@ -110,15 +112,9 @@ namespace libusb {
             markGap();
             queueAllFrameReads();
         }
-
-        _readThread = std::thread(&CaptureStream::readLoop, this);
     }
 
     void CaptureStream::deliver(const ChunkCallback &callback) {
-        if (_hasError.load(std::memory_order_acquire)) {
-            throw std::runtime_error(_errorMessage);
-        }
-
         // Drain everything pending so a slow consumer catches up (or drops oldest) in one pass.
         for (;;) {
             uint32_t length = 0;
@@ -138,9 +134,16 @@ namespace libusb {
     }
 
     void CaptureStream::stop() {
-        _shuttingDown = true;
-        if (_readThread.joinable()) {
-            _readThread.join();
+        {
+            std::unique_lock<std::mutex> lock(_transfersMutex);
+            _shuttingDown = true;
+            for (auto *transfer : _transfers) {
+                libusb_cancel_transfer(transfer);
+            }
+            // Completions (on the event thread) free each cancelled transfer and remove it.
+            if (!_transfersDrained.wait_for(lock, STOP_TIMEOUT, [this] { return _transfers.empty(); })) {
+                fprintf(stderr, "%zu USB transfers did not complete after cancellation\n", _transfers.size());
+            }
         }
 
         if (_dumpFile != nullptr) {
@@ -148,6 +151,15 @@ namespace libusb {
             _dumpFile = nullptr;
             printf("Wrote %llu raw chunks to dump file\n", (unsigned long long) _dumpCount);
         }
+    }
+
+    bool CaptureStream::failed() const {
+        return _hasError.load(std::memory_order_acquire);
+    }
+
+    std::string CaptureStream::failure() const {
+        std::lock_guard<std::mutex> lock(_errorMutex);
+        return _errorMessage;
     }
 
     void CaptureStream::dumpChunk(const uint8_t *data, uint32_t length, bool gapped) {
@@ -190,35 +202,37 @@ namespace libusb {
         _gapPending = true;
     }
 
-    void CaptureStream::readLoop() {
-        struct timeval tv{0, 100000};  // 100ms timeout so shutdown is responsive
-        bool cancelledAll = false;
-
-        while (true) {
-            libusb_handle_events_timeout(nullptr, &tv);
-
-            if (_shuttingDown && !cancelledAll) {
-                cancelledAll = true;
-                for (auto *transfer : _transfers) {
-                    libusb_cancel_transfer(transfer);
-                }
-            }
-
-            if (_transfers.empty()) break;
+    void CaptureStream::addTransferLocked(libusb_transfer *transfer) {
+        int res = libusb_submit_transfer(transfer);
+        if (res != LIBUSB_SUCCESS) {
+            libusb_free_transfer(transfer);
+            if (res == LIBUSB_ERROR_NO_DEVICE) signalError("USB capture device was disconnected");
+            return;
         }
+        _transfers.push_back(transfer);
+    }
+
+    void CaptureStream::removeTransferLocked(libusb_transfer *transfer) {
+        auto it = std::find(_transfers.begin(), _transfers.end(), transfer);
+        if (it != _transfers.end()) _transfers.erase(it);
+        if (_transfers.empty()) _transfersDrained.notify_all();
     }
 
     void CaptureStream::submitTransfer(libusb_transfer *transfer) {
+        std::lock_guard<std::mutex> lock(_transfersMutex);
         if (!_shuttingDown) {
-            libusb_submit_transfer(transfer);
-        } else {
-            libusb_free_transfer(transfer);
-            _transfers.erase(std::find(_transfers.begin(), _transfers.end(), transfer));
+            int res = libusb_submit_transfer(transfer);
+            if (res == LIBUSB_SUCCESS) return;
+            // Could not resubmit (e.g. the device is gone): drop it so stop() is not left waiting.
+            if (res == LIBUSB_ERROR_NO_DEVICE) signalError("USB capture device was disconnected");
         }
+        removeTransferLocked(transfer);
+        libusb_free_transfer(transfer);
     }
 
     void CaptureStream::discardTransfer(libusb_transfer *transfer) {
-        _transfers.erase(std::find(_transfers.begin(), _transfers.end(), transfer));
+        std::lock_guard<std::mutex> lock(_transfersMutex);
+        removeTransferLocked(transfer);
         libusb_free_transfer(transfer);
     }
 
@@ -227,7 +241,13 @@ namespace libusb {
     }
 
     void CaptureStream::signalError(const char *message) {
-        _errorMessage = message;
+        {
+            // Every in-flight transfer reports a disconnect: keep and print only the first.
+            std::lock_guard<std::mutex> lock(_errorMutex);
+            if (_hasError) return;
+            _errorMessage = message;
+        }
+        fprintf(stderr, "%s\n", message);
         _hasError.store(true, std::memory_order_release);
     }
 
@@ -240,6 +260,8 @@ namespace libusb {
     }
 
     void CaptureStream::queueAllFrameReads() {
+        std::lock_guard<std::mutex> lock(_transfersMutex);
+        if (_shuttingDown) return;
         for (int i = 0; i < TRANSFER_POOL_SIZE; i++) {
             libusb_transfer *transfer = libusb_alloc_transfer(0);
 
@@ -247,8 +269,7 @@ namespace libusb {
                                       _frameBuffer + i * CHUNK_BYTES, CHUNK_BYTES,
                                       usbTransferComplete, this, 0);
 
-            _transfers.push_back(transfer);
-            libusb_submit_transfer(transfer);
+            addTransferLocked(transfer);
         }
     }
 }

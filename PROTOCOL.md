@@ -563,16 +563,26 @@ meaning is not yet traced.
 **Detecting an already-bootstrapped board (userspace).** The configuration
 survives a USB reset (including the `libusb_reset_device` at shutdown) and is
 only lost on unplug. Re-running the bootstrap on a configured board is what
-produced garbage output. The bootstrap sets the PCA9539A (0x74)
-configuration registers 0x06/0x07 to `00 09`. Their power-on default is
-`FF FF` (all inputs), and the expander is bus-powered, so a USB reset leaves
-it alone. `UsbStream::detectLgx2BoardState` reads them before bootstrapping:
-- `FF FF` means fresh, so run the bootstrap.
-- `00 09` plus ADV7604 IO 0xFA (EDID map address) = `0x6C` means already
-  configured. Skip the bootstrap, skip the frame-boundary probe, and let the
-  FrameBuilder re-sync mid-stream.
-- Anything else, or a failed read, falls back to the old IN 0x83 data check
-  and its error message.
+produced garbage output. `Bootstrapper::detectLgx2BoardState` reads two
+bus-powered chips that a USB reset leaves alone:
+- **ADV7604 IO 0xFA** (EDID map address): reset value `0x00`; the bootstrap
+  sets it to `0x6C`.
+- **PCA9539A (0x74) configuration registers 0x06/0x07**: `00 89` on a
+  freshly plugged card (hardware-observed). This is not the datasheet's
+  `FF FF`, so the card's own firmware evidently configures the expander at
+  power-up. The bootstrap leaves them at `00 09`.
+
+The decision:
+- EDID map ≠ `0x6C` means fresh, so run the bootstrap (cold plug observed:
+  `0x00`, `00 89`).
+- EDID map = `0x6C` and expander `00 09` means already configured. Skip the
+  bootstrap, skip the frame-boundary probe, and let the parser re-sync
+  mid-stream.
+- `0x6C` with any other expander value, or a failed read, falls back to the
+  old IN 0x83 data check and its error message.
+
+(The first version tested the expander for `FF FF`, which never matched on
+real hardware; cold plugs only worked through the fallback.)
 
 **Hardware result: reuse works intermittently.** In one test the first reuse
 after a clean session gave good video. The next reuse gave **audio but no

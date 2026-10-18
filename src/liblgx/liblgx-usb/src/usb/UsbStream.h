@@ -3,18 +3,15 @@
 
 #include <memory>
 #include <vector>
-#include <libusb-1.0/libusb.h>
 #include "lgxdevice.h"
-#include "CommandBridge.h"
-#include "Bootstrapper.h"
-#include "StatusMonitor.h"
-#include "CaptureStream.h"
+#include "UsbContext.h"
+#include "DeviceSession.h"
 
 namespace libusb {
 
-    // lgx2::Stream over a USB-connected LGX2/LGX: finds and opens the device, then composes the
-    // CommandBridge (register access), Bootstrapper (make it stream), StatusMonitor (HDMI input
-    // state) and CaptureStream (the IN 0x83 data).
+    // lgx2::Stream over a USB-connected LGX2/LGX for the standalone viewer: finds the card at
+    // startup and runs one DeviceSession on it. A session that ends (disconnect, failed stream)
+    // is reported as an error from update(), so the viewer stops.
     class UsbStream : public lgx2::Stream {
     public:
         explicit UsbStream();
@@ -34,20 +31,12 @@ namespace libusb {
         lgx2::InputState inputState() const override;
 
     private:
-        libusb_device_handle *_dev{nullptr};
-        lgx2::DeviceType _deviceType{lgx2::DeviceType::LGX2};
-        std::vector<lgx2::DeviceType> _availableDevices;
-        bool _alreadyBootstrapped{false};
-
-        std::unique_ptr<CommandBridge> _bridge;
-        std::unique_ptr<StatusMonitor> _statusMonitor;
-        std::unique_ptr<CaptureStream> _capture;
+        // Declared first so it is destroyed last: the session's transfers need its event thread.
+        UsbContext _context;
+        std::vector<FoundDevice> _devices;
+        std::unique_ptr<DeviceSession> _session;
 
         std::function<void(uint8_t *, uint32_t, bool)> *_onFrameDataCallback{nullptr};
-
-        // The status poll reads ADV7604 registers, which only the GC551 has. Set
-        // LGX2_NO_STATUS_POLL=1 to disable it.
-        bool statusPollEnabled() const;
     };
 }
 
