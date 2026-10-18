@@ -120,6 +120,8 @@ namespace libusb {
         void probeStatusBeforeStreaming();
         int readAdvStatus(lgx2::AdvStatusRegisters &regs);
         int i2cRead(uint8_t address, uint8_t reg, uint8_t *out, uint8_t count);
+        int i2cWrite(uint8_t address, uint8_t reg, uint8_t value);
+        void setAutoInputColourSpace();
         void drainCommandResponses();
 
         void readLoop();

@@ -688,10 +688,36 @@ not a driver bug — the device simply does not support RGB input at the USB
 stream level. A colourspace conversion step in the driver before rendering would
 fix it, but is not currently implemented.
 
-**Sony A7C III (and likely other cameras)** — Camera HDMI outputs vary in
-colourspace and range by model and settings. The A7C III produces recognisable
-video with visible hue/saturation shifts, consistent with a range or matrix
-mismatch.
+**Sony A7 III (and likely other cameras)** (previously noted here as "A7C
+III"). A capture (`/tmp/lgx_reuse-a7iii.cab`) shows correct timing and
+structure:
+- Audio packets are 3,840 bytes per frame (48 kHz × 4 bytes ÷ 50), so the
+  camera sends **1080p50**. The frame period is still 254 × 16 KiB, and the
+  BufferReorderer and FrameBuilder handle it unchanged (63 frames).
+
+The colour, however, is a strong uniform green:
+- Cb and Cr sit around 109, never exceed 128, and are almost exact linear
+  functions of luma (fit residual ≈ 1.5 levels). The chroma information is
+  gone, so software post-processing cannot recover it.
+- **Cause:** the replayed bootstrap leaves ADV7604 IO 0x02 at `0x1C`. Bits
+  7:4 = `0x1` mean the input colour space is fixed to **full-range RGB**:
+  correct for the source the Windows capture was taken with (the Switch
+  outputs RGB), wrong for a YCbCr camera. The Windows driver picks this per
+  source (`HAL_RxSetAutoIpColorSpace`, `APP_SetOutputCS`); a replay cannot.
+  This probably also explains the MacBook tint.
+- **Fix:** after bootstrap or reuse, `UsbStream::setAutoInputColourSpace` sets
+  bits 7:4 to `0xF` (automatic: chosen from the source's AVI InfoFrame),
+  keeping the output bits. That is what Linux adv7604.c does for HDMI
+  (`set_rgb_quantization_range`).
+- The status line now shows the source's colour format (AVI InfoFrame byte
+  1, bits 6:5, valid when IO 0x60 bit 0 is set) and the receiver's input
+  colour-space setting.
+
+Not yet verified with the camera on hardware.
+
+Separately, the SDL display path creates its YUY2 texture without an explicit
+colour space, so the matrix/range used for display is SDL's default; that
+should be set to match the source (BT.709 limited for HD video).
 
 The INF notes the device supports `VGA` mode (RGB24), `YUV422`, and `YUV444`
 as a compile-time choice (the `VGA` registry key is commented out, leaving

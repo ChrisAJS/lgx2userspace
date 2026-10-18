@@ -17,6 +17,9 @@ namespace {
         r.io6f = 0x10;               // +5V on port A
         r.io6a = 0xF0;               // TMDS clock detected + PLL locked
         r.cpB1 = 0x80;               // STDI valid
+        r.io02 = 0xFC;               // input colour space automatic, YCbCr output
+        r.io60 = 0x01;               // AVI InfoFrame received
+        r.avi01 = 0x00;              // colour format RGB
         r.hdmi05to0c[0] = 0x80;      // HDMI mode, no pixel repetition
         r.hdmi05to0c[1] = 148;       // TMDS MHz
         put16(&r.hdmi05to0c[2], 1920);
@@ -45,7 +48,29 @@ TEST_CASE("Locked 1080p60 decodes to its CEA timing") {
     CHECK(s.totalHeight == 1125);
     CHECK(s.pixelClockHz == 148500000);
     CHECK(s.refreshHz() == Catch::Approx(60.0));
-    CHECK(s.describe() == "1920x1080p @ 60.00 Hz (148.50 MHz, HDMI)");
+    CHECK(s.colourFormat == SignalStatus::ColourFormat::RGB);
+    CHECK(s.describe() == "1920x1080p @ 60.00 Hz (148.50 MHz, HDMI, RGB; receiver input colour space auto)");
+}
+
+TEST_CASE("AVI InfoFrame colour format and a fixed receiver input colour space are reported") {
+    AdvStatusRegisters r = locked1080p60();
+    r.avi01 = 0x20;   // Y1Y0 = 01: YCbCr 4:2:2
+    r.io02 = 0x1C;    // input fixed to full-range RGB, as the replayed bootstrap leaves it
+
+    SignalStatus s = SignalStatus::decode(r);
+    CHECK(s.colourFormat == SignalStatus::ColourFormat::YCbCr422);
+    CHECK(s.inputColourSpace == 0x1);
+    CHECK(s.describe() == "1920x1080p @ 60.00 Hz (148.50 MHz, HDMI, YCbCr 4:2:2; receiver input colour space fixed 0x1)");
+
+    // Without a received AVI InfoFrame the format is unknown.
+    r.io60 = 0x00;
+    CHECK(SignalStatus::decode(r).colourFormat == SignalStatus::ColourFormat::Unknown);
+
+    // A change of source format is reported as a change.
+    AdvStatusRegisters rgb = locked1080p60();
+    CHECK(SignalStatus::decode(rgb) == SignalStatus::decode(locked1080p60()));
+    rgb.avi01 = 0x40; // YCbCr 4:4:4
+    CHECK(SignalStatus::decode(rgb) != SignalStatus::decode(locked1080p60()));
 }
 
 TEST_CASE("No +5V reports no cable") {

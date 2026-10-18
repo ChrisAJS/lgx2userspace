@@ -200,9 +200,47 @@ namespace libusb {
             drainCommandResponses();
         }
 
-        if (deviceType == lgx2::DeviceType::LGX2 && std::getenv("LGX2_NO_STATUS_POLL") == nullptr) {
-            probeStatusBeforeStreaming();
+        if (deviceType == lgx2::DeviceType::LGX2) {
+            setAutoInputColourSpace();
+            if (std::getenv("LGX2_NO_STATUS_POLL") == nullptr) {
+                probeStatusBeforeStreaming();
+            }
         }
+    }
+
+    void UsbStream::setAutoInputColourSpace() {
+        // The replayed bootstrap leaves the ADV7604's input colour space (IO 0x02 bits 7:4) fixed to
+        // full-range RGB (0x1C), as the Windows driver set it for the source connected when the
+        // capture was taken. A YCbCr source (e.g. a camera) is then converted as if it were RGB and
+        // its colour is destroyed. Use automatic mode instead (0xF: chosen from the source's AVI
+        // InfoFrame), as Linux adv7604.c does for HDMI, keeping the output-format bits.
+        constexpr uint8_t ADV_IO = 0x20;
+        uint8_t io02 = 0;
+        int res = i2cRead(ADV_IO, 0x02, &io02, 1);
+        if (res != LIBUSB_SUCCESS) {
+            fprintf(stderr, "Could not read the receiver's input colour space (%s on %s)\n",
+                    libusb_error_name(res), _lastCommandFailure);
+            drainCommandResponses();
+            return;
+        }
+        uint8_t automatic = static_cast<uint8_t>((io02 & 0x0F) | 0xF0);
+        if (automatic == io02) return;
+        if (i2cWrite(ADV_IO, 0x02, automatic) != LIBUSB_SUCCESS) {
+            fprintf(stderr, "Could not set the receiver's input colour space to automatic\n");
+            return;
+        }
+        printf("Receiver input colour space: automatic (IO 0x02 0x%02X -> 0x%02X)\n", io02, automatic);
+    }
+
+    int UsbStream::i2cWrite(uint8_t address, uint8_t reg, uint8_t value) {
+        // Bridge write request: 01 <addr> <reg addr length=1> <reg> <data>; no reply.
+        uint8_t request[] = {0x01, address, 0x01, reg, value};
+        int actualLength = 0;
+        _lastCommandFailure = "request (OUT 0x01)";
+        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, request, sizeof(request),
+                                       &actualLength, COMMAND_TIMEOUT_MS);
+        if (res != LIBUSB_SUCCESS) return res;
+        return actualLength == static_cast<int>(sizeof(request)) ? LIBUSB_SUCCESS : LIBUSB_ERROR_IO;
     }
 
     UsbStream::BoardState UsbStream::detectLgx2BoardState() {
@@ -347,6 +385,7 @@ namespace libusb {
         constexpr uint8_t ADV_IO = 0x20;
         constexpr uint8_t ADV_CP = 0x22;
         constexpr uint8_t ADV_HDMI = 0x34;
+        constexpr uint8_t ADV_INFOFRAME = 0x3E;
 
         int res;
         if ((res = i2cRead(ADV_IO, 0x0C, &regs.io0c, 1)) != LIBUSB_SUCCESS) return res;
@@ -354,6 +393,9 @@ namespace libusb {
         if ((res = i2cRead(ADV_IO, 0x6A, &regs.io6a, 1)) != LIBUSB_SUCCESS) return res;
         if ((res = i2cRead(ADV_IO, 0x6F, &regs.io6f, 1)) != LIBUSB_SUCCESS) return res;
         if ((res = i2cRead(ADV_CP, 0xB1, &regs.cpB1, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_IO, 0x02, &regs.io02, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_IO, 0x60, &regs.io60, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = i2cRead(ADV_INFOFRAME, 0x01, &regs.avi01, 1)) != LIBUSB_SUCCESS) return res;
         // Block reads stay at or below 13 bytes, the largest read seen in the bootstrap capture.
         if ((res = i2cRead(ADV_HDMI, 0x05, regs.hdmi05to0c, sizeof(regs.hdmi05to0c))) != LIBUSB_SUCCESS) return res;
         if ((res = i2cRead(ADV_HDMI, 0x20, regs.hdmi20to25, sizeof(regs.hdmi20to25))) != LIBUSB_SUCCESS) return res;

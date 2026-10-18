@@ -20,6 +20,12 @@ namespace lgx2 {
         s.poweredDown = regs.io0c & 0x24;
         s.hdmiMode = h[0] & 0x80;
         s.interlaced = regs.io12 & 0x10;
+        s.inputColourSpace = regs.io02 >> 4;
+        if (s.hdmiMode && (regs.io60 & 0x01)) {
+            static constexpr ColourFormat FORMATS[4] = {ColourFormat::RGB, ColourFormat::YCbCr422,
+                                                        ColourFormat::YCbCr444, ColourFormat::YCbCr420};
+            s.colourFormat = FORMATS[(regs.avi01 >> 5) & 0x03];
+        }
 
         s.width = read16(&h[2], 0x0FFF);
         s.height = read16(&h[4], 0x0FFF);
@@ -63,10 +69,19 @@ namespace lgx2 {
         if (!cableDetected) return "no cable";
         if (!signalPresent()) return "cable connected, no signal";
 
-        char text[96];
-        snprintf(text, sizeof(text), "%ux%u%c @ %.2f Hz (%.2f MHz, %s)",
+        static const char *FORMAT_NAMES[] = {"format unknown", "RGB", "YCbCr 4:2:2", "YCbCr 4:4:4", "YCbCr 4:2:0"};
+        char input[24];
+        if (inputColourSpace == 0xF) {
+            snprintf(input, sizeof(input), "auto");
+        } else {
+            snprintf(input, sizeof(input), "fixed 0x%X", inputColourSpace);
+        }
+
+        char text[160];
+        snprintf(text, sizeof(text), "%ux%u%c @ %.2f Hz (%.2f MHz, %s, %s; receiver input colour space %s)",
                  width, height, interlaced ? 'i' : 'p', refreshHz(),
-                 pixelClockHz / 1e6, hdmiMode ? "HDMI" : "DVI");
+                 pixelClockHz / 1e6, hdmiMode ? "HDMI" : "DVI",
+                 FORMAT_NAMES[static_cast<int>(colourFormat)], input);
         return text;
     }
 
@@ -78,6 +93,8 @@ namespace lgx2 {
         if (!signalPresent()) return true;
         return hdmiMode == other.hdmiMode &&
                interlaced == other.interlaced &&
+               colourFormat == other.colourFormat &&
+               inputColourSpace == other.inputColourSpace &&
                width == other.width &&
                height == other.height &&
                totalWidth == other.totalWidth &&

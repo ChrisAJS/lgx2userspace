@@ -19,6 +19,11 @@ namespace lgx2 {
         // CP map (I2C 0x22)
         uint8_t cpB1{0};   // bit 7 = STDI data valid
 
+        uint8_t io02{0};   // bits 7:4 = input colour space (0xF = automatic, from the AVI InfoFrame)
+        uint8_t io60{0};   // bit 0 = AVI InfoFrame received
+        // InfoFrame map (I2C 0x3E): AVI InfoFrame data byte 1, bits 6:5 = colour format
+        uint8_t avi01{0};
+
         // HDMI map (I2C 0x34), read as blocks
         uint8_t hdmi05to0c[8]{};   // 05 mode/polarity/pixel-rep, 06 TMDS MHz, 07-08 width,
                                    // 09-0A field0 height, 0B deep colour + 0B-0C field1 height
@@ -35,6 +40,11 @@ namespace lgx2 {
         bool poweredDown{false};
         bool hdmiMode{false};    // false = DVI
         bool interlaced{false};
+
+        // What the source says it sends (AVI InfoFrame), and what the ADV7604 is set to expect.
+        enum class ColourFormat { Unknown, RGB, YCbCr422, YCbCr444, YCbCr420 };
+        ColourFormat colourFormat{ColourFormat::Unknown};
+        uint8_t inputColourSpace{0}; // IO 0x02 bits 7:4; 0xF = automatic
 
         uint16_t width{0};
         uint16_t height{0};      // per frame (both fields when interlaced)
