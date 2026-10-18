@@ -87,6 +87,14 @@ namespace libusb {
         static constexpr int MAX_PROBE_ATTEMPTS = 8;
         int _probeAttempts{0};
 
+        // Whether the board still holds a configuration from an earlier bootstrap (which
+        // survives a USB reset), read back from registers the bootstrap sets.
+        enum class BoardState { Fresh, Configured, Unknown };
+        bool _alreadyBootstrapped{false};
+
+        BoardState detectLgx2BoardState();
+        void runSetupCommands(const std::string &targetCommands);
+
         // Periodic read-only HDMI input status poll (GC551 only), modelled on the Windows
         // driver's 200 ms CRXADV7604 poll thread. It issues I2C reads over the command
         // endpoints (bulk OUT/IN 0x01) while the stream runs on IN 0x83, and logs changes in

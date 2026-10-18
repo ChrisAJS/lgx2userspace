@@ -174,14 +174,69 @@ namespace libusb {
                     "Could not claim interface for the device - is something else using the device?");
         }
 
-        int check = 0;
-        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x03, _frameBuffer, LGX_DATA_FRAME_LEN, &check, 100);
-        if (res != LIBUSB_ERROR_TIMEOUT) {
-            throw std::runtime_error("Device already been bootstrapped. This results in garbage output. Please unplug and re-plug in the device.");
+        BoardState boardState = deviceType == lgx2::DeviceType::LGX2 ? detectLgx2BoardState() : BoardState::Unknown;
+        if (boardState == BoardState::Configured) {
+            // Re-running the bootstrap on a configured board is what produced garbage output, and
+            // the configuration survives a USB reset, so keep it and just start streaming.
+            printf("Device is already bootstrapped - reusing its existing configuration\n");
+            _alreadyBootstrapped = true;
         } else {
+            if (boardState == BoardState::Unknown) {
+                // Board state could not be read: fall back to checking whether video is flowing.
+                int check = 0;
+                int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x03, _frameBuffer, LGX_DATA_FRAME_LEN,
+                                               &check, 100);
+                if (res != LIBUSB_ERROR_TIMEOUT) {
+                    throw std::runtime_error("Device already been bootstrapped. This results in garbage output. Please unplug and re-plug in the device.");
+                }
+            }
             printf("Bootstrapping the device\n");
+            runSetupCommands(targetCommands);
+            printf("Bootstrapping complete\n");
+
+            // The LGX2 command capture was cut off mid-transaction: it ends with a read request
+            // (>02220102A8) whose 2-byte reply is never read. Collect it now, otherwise it sits in
+            // IN 0x81 and is returned as the answer to the next command read.
+            drainCommandResponses();
         }
 
+        if (deviceType == lgx2::DeviceType::LGX2 && std::getenv("LGX2_NO_STATUS_POLL") == nullptr) {
+            probeStatusBeforeStreaming();
+        }
+    }
+
+    UsbStream::BoardState UsbStream::detectLgx2BoardState() {
+        // A reply left over from an interrupted previous session would be read as our answer.
+        drainCommandResponses();
+
+        // The PCA9539A GPIO expander powers up with both configuration registers at 0xFF (all
+        // inputs); the bootstrap sets them to 00/09. It is bus powered and unaffected by a USB
+        // reset, so these values identify a board that is still configured from an earlier run.
+        constexpr uint8_t PCA9539A = 0x74;
+        uint8_t pcaConfig[2];
+        if (i2cRead(PCA9539A, 0x06, pcaConfig, sizeof(pcaConfig)) != LIBUSB_SUCCESS) {
+            drainCommandResponses();
+            return BoardState::Unknown;
+        }
+        if (pcaConfig[0] == 0xFF && pcaConfig[1] == 0xFF) {
+            return BoardState::Fresh;
+        }
+
+        // Confirm with the ADV7604, whose EDID map address (IO 0xFA) the bootstrap sets to 0x6C.
+        constexpr uint8_t ADV_IO = 0x20;
+        uint8_t edidMapAddress = 0;
+        if (pcaConfig[0] == 0x00 && pcaConfig[1] == 0x09 &&
+            i2cRead(ADV_IO, 0xFA, &edidMapAddress, 1) == LIBUSB_SUCCESS && edidMapAddress == 0x6C) {
+            return BoardState::Configured;
+        }
+
+        drainCommandResponses();
+        fprintf(stderr, "Unrecognised board state (PCA9539A config %02X %02X, ADV7604 EDID map 0x%02X)\n",
+                pcaConfig[0], pcaConfig[1], edidMapAddress);
+        return BoardState::Unknown;
+    }
+
+    void UsbStream::runSetupCommands(const std::string &targetCommands) {
         int actualLength;
         uint8_t transferBuffer[512]{0};
 
@@ -206,30 +261,27 @@ namespace libusb {
                 }
             }
         }
-
-        printf("Bootstrapping complete\n");
-
-        // The LGX2 command capture was cut off mid-transaction: it ends with a read request
-        // (>02220102A8) whose 2-byte reply is never read. Collect it now, otherwise it sits in
-        // IN 0x81 and is returned as the answer to the next command read.
-        drainCommandResponses();
-
-        if (deviceType == lgx2::DeviceType::LGX2 && std::getenv("LGX2_NO_STATUS_POLL") == nullptr) {
-            probeStatusBeforeStreaming();
-        }
     }
 
     void UsbStream::queueFrameRead(std::function<void(uint8_t *, uint32_t, bool)> *onData) {
         _onFrameDataCallback = onData;
 
-        _probeTransfer = libusb_alloc_transfer(0);
+        if (_alreadyBootstrapped) {
+            // The device is mid-stream with whatever it buffered since the last session, so the
+            // first transfer will not start on a frame boundary. Skip the alignment probe and let
+            // the FrameBuilder re-sync on the first clean SAV->EAV pair instead.
+            markGap();
+            queueAllFrameReads();
+        } else {
+            _probeTransfer = libusb_alloc_transfer(0);
 
-        libusb_fill_bulk_transfer(_probeTransfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
-                                  _frameBuffer, LGX_DATA_FRAME_LEN,
-                                  probeTransferComplete, this, 0);
+            libusb_fill_bulk_transfer(_probeTransfer, _dev, LIBUSB_ENDPOINT_IN | 0x03,
+                                      _frameBuffer, LGX_DATA_FRAME_LEN,
+                                      probeTransferComplete, this, 0);
 
-        _transfers.push_back(_probeTransfer);
-        libusb_submit_transfer(_probeTransfer);
+            _transfers.push_back(_probeTransfer);
+            libusb_submit_transfer(_probeTransfer);
+        }
 
         _readThread = std::thread(&UsbStream::readLoop, this);
 
