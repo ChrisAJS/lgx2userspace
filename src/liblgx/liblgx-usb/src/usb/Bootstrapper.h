@@ -25,9 +25,11 @@ namespace libusb {
         libusb_device_handle *_dev;
         CommandBridge &_bridge;
 
-        BoardState detectLgx2BoardState();
+        BoardState detectBoardState();
         bool videoAlreadyFlowing();
+        void reportCryptoAttemptCounters();
         void setAutoInputColourSpace();
+        void resetPictureAdjustment();
     };
 }
 

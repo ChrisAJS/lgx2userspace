@@ -11,7 +11,8 @@ namespace libusb {
         }
     }
 
-    StatusMonitor::StatusMonitor(CommandBridge &bridge) : _bridge{bridge} {
+    StatusMonitor::StatusMonitor(CommandBridge &bridge, lgx2::DeviceType deviceType)
+            : _bridge{bridge}, _infoFrameAddress{static_cast<uint8_t>(deviceType == lgx2::DeviceType::LGX2 ? 0x3E : 0x46)} {
     }
 
     StatusMonitor::~StatusMonitor() {
@@ -108,11 +109,10 @@ namespace libusb {
     }
 
     int StatusMonitor::readAdvStatus(lgx2::AdvStatusRegisters &regs) {
-        // 7-bit I2C addresses of the ADV7604 maps, as programmed by the bootstrap.
+        // 7-bit I2C addresses of the ADV7604 maps, as programmed by both bootstraps (IO 0xF3-0xFE).
         constexpr uint8_t ADV_IO = 0x20;
         constexpr uint8_t ADV_CP = 0x22;
         constexpr uint8_t ADV_HDMI = 0x34;
-        constexpr uint8_t ADV_INFOFRAME = 0x3E;
 
         int res;
         if ((res = _bridge.i2cRead(ADV_IO, 0x0C, &regs.io0c, 1)) != LIBUSB_SUCCESS) return res;
@@ -122,7 +122,7 @@ namespace libusb {
         if ((res = _bridge.i2cRead(ADV_CP, 0xB1, &regs.cpB1, 1)) != LIBUSB_SUCCESS) return res;
         if ((res = _bridge.i2cRead(ADV_IO, 0x02, &regs.io02, 1)) != LIBUSB_SUCCESS) return res;
         if ((res = _bridge.i2cRead(ADV_IO, 0x60, &regs.io60, 1)) != LIBUSB_SUCCESS) return res;
-        if ((res = _bridge.i2cRead(ADV_INFOFRAME, 0x01, &regs.avi01, 1)) != LIBUSB_SUCCESS) return res;
+        if ((res = _bridge.i2cRead(_infoFrameAddress, 0x01, &regs.avi01, 1)) != LIBUSB_SUCCESS) return res;
         // Block reads stay at or below 13 bytes, the largest read seen in the bootstrap capture.
         if ((res = _bridge.i2cRead(ADV_HDMI, 0x05, regs.hdmi05to0c, sizeof(regs.hdmi05to0c))) != LIBUSB_SUCCESS) return res;
         if ((res = _bridge.i2cRead(ADV_HDMI, 0x20, regs.hdmi20to25, sizeof(regs.hdmi20to25))) != LIBUSB_SUCCESS) return res;

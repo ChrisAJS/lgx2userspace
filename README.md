@@ -23,6 +23,13 @@ To enable LGX (GC550) support, add `-DENABLE_LGX_GC550_SUPPORT=ON` to the `cmake
 
 **It cannot be stressed enough, that this currently will make your LGX (GC550) unusable on Windows using the official driver.**
 
+*Update (untested on Windows):* the cause appears to have been found and removed. Older versions replayed a recorded
+login to the card's anti-clone chip, which always fails and permanently locks the chip after a few runs; the official
+driver then rejects the card. The bootstrap no longer sends it. On a GC550, every run prints the chip's attempt counters
+(`Anti-clone chip attempt counters ...`): `FF` means untouched, `00` means locked. A pristine card stays at `FF` across
+runs, but whether it still works with the official driver afterwards has not been confirmed yet, so the warning above
+stands until it has. See PROTOCOL.md, "GC550 (LGX) bootstrap".
+
 ## Building
 To build the project, you will need:
 * CMake
@@ -80,7 +87,7 @@ cmake --build build
 
 | Variable | Description |
 |---|---|
-| `LGX2_NO_STATUS_POLL` | Set to any value to disable the HDMI input status poll. By default the LGX2 (GC551) is polled every 50 ms and changes are printed, e.g. `HDMI input: 1920x1080p @ 60.00 Hz (148.50 MHz, HDMI, YCbCr 4:2:2; receiver input colour space auto)` or `HDMI input: no cable`. The poll also mutes audio and blanks video while there is no signal; without it, nothing is muted. |
+| `LGX2_NO_STATUS_POLL` | Set to any value to disable the HDMI input status poll. By default the card (LGX2 or LGX) is polled every 50 ms and changes are printed, e.g. `HDMI input: 1920x1080p @ 60.00 Hz (148.50 MHz, HDMI, YCbCr 4:2:2; receiver input colour space auto)` or `HDMI input: no cable`. The poll also mutes audio and blanks video while there is no signal; without it, nothing is muted. |
 | `LGX2_DUMP_FILE` | Path to write the first 128 raw USB chunks to, for offline stream analysis. |
 
 ## Setup

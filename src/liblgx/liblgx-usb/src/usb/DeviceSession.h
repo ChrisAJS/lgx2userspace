@@ -16,7 +16,7 @@ namespace libusb {
     class DeviceSession {
     public:
         struct Options {
-            // Poll HDMI input status (ADV7604 registers, GC551 only).
+            // Poll HDMI input status (ADV7604 registers).
             bool statusPoll{true};
         };
 

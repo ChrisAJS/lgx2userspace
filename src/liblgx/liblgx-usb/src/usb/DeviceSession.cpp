@@ -26,7 +26,7 @@ namespace libusb {
         }
 
         _bridge = std::make_unique<CommandBridge>(_dev);
-        _statusMonitor = std::make_unique<StatusMonitor>(*_bridge);
+        _statusMonitor = std::make_unique<StatusMonitor>(*_bridge, _type);
     }
 
     DeviceSession::~DeviceSession() {
@@ -34,7 +34,7 @@ namespace libusb {
     }
 
     bool DeviceSession::statusPollEnabled() const {
-        return _type == lgx2::DeviceType::LGX2 && _options.statusPoll;
+        return _options.statusPoll;
     }
 
     void DeviceSession::bootstrap() {
@@ -50,7 +50,7 @@ namespace libusb {
 
         if (statusPollEnabled()) {
             _statusMonitor->start();
-        } else if (_type == lgx2::DeviceType::LGX2) {
+        } else {
             printf("HDMI input status poll disabled\n");
         }
     }

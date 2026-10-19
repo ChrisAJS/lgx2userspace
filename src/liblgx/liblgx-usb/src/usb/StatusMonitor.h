@@ -11,7 +11,7 @@
 #include "CommandBridge.h"
 
 namespace libusb {
-    // Periodic read-only HDMI input status poll (GC551 only), modelled on the Windows driver's
+    // Periodic read-only HDMI input status poll of the ADV7604, modelled on the Windows driver's
     // poll threads. It issues I2C reads through the CommandBridge while the stream runs on
     // IN 0x83, logs changes in cable/signal/resolution, and publishes the InputState that drives
     // audio muting and the no-signal screen.
@@ -22,7 +22,7 @@ namespace libusb {
         static constexpr auto POLL_INTERVAL = std::chrono::milliseconds(50);
         static constexpr int MAX_CONSECUTIVE_FAILURES = 10;
 
-        explicit StatusMonitor(CommandBridge &bridge);
+        StatusMonitor(CommandBridge &bridge, lgx2::DeviceType deviceType);
         ~StatusMonitor();
 
         // One status read before streaming starts (also a diagnostic: the bootstrap's own reads
@@ -39,6 +39,9 @@ namespace libusb {
 
     private:
         CommandBridge &_bridge;
+        // 7-bit I2C address of the ADV7604's InfoFrame map, the one map the two bootstraps place
+        // differently.
+        uint8_t _infoFrameAddress;
         std::atomic<lgx2::InputState> _inputState{lgx2::InputState::Signal};
 
         std::thread _thread;

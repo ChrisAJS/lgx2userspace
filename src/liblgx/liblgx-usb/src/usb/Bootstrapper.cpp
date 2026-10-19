@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "CaptureStream.h"
@@ -27,8 +28,12 @@ namespace libusb {
 #endif
         }
 
+        if (deviceType != lgx2::DeviceType::LGX2) {
+            reportCryptoAttemptCounters();
+        }
+
         bool alreadyBootstrapped = false;
-        BoardState boardState = deviceType == lgx2::DeviceType::LGX2 ? detectLgx2BoardState() : BoardState::Unknown;
+        BoardState boardState = detectBoardState();
         if (boardState == BoardState::Configured) {
             // Re-running the bootstrap on a configured board is what produced garbage output, and
             // the configuration survives a USB reset, so keep it and just start streaming.
@@ -49,9 +54,10 @@ namespace libusb {
             _bridge.drainResponses();
         }
 
-        if (deviceType == lgx2::DeviceType::LGX2) {
-            setAutoInputColourSpace();
-        }
+        // Both cards use an ADV7604 at the same I2C addresses, and both replays leave it set up
+        // for the source that was connected when they were recorded.
+        setAutoInputColourSpace();
+        resetPictureAdjustment();
         return alreadyBootstrapped;
     }
 
@@ -63,15 +69,15 @@ namespace libusb {
         return res != LIBUSB_ERROR_TIMEOUT;
     }
 
-    Bootstrapper::BoardState Bootstrapper::detectLgx2BoardState() {
+    Bootstrapper::BoardState Bootstrapper::detectBoardState() {
         // A reply left over from an interrupted previous session would be read as our answer.
         _bridge.drainResponses();
 
         // The ADV7604's EDID map address (IO 0xFA) resets to 0x00 and the bootstrap sets it to
         // 0x6C; the PCA9539A GPIO expander's configuration registers end up 00/09 after the
-        // bootstrap (the card's own firmware leaves them at 00/89 on power-up). Both are bus
+        // bootstrap (the GC551's own firmware leaves them at 00/89 on power-up). Both are bus
         // powered and unaffected by a USB reset, so together they identify a board that is
-        // still configured from an earlier run.
+        // still configured from an earlier run. The GC550 bootstrap sets the same values.
         constexpr uint8_t ADV_IO = 0x20;
         constexpr uint8_t PCA9539A = 0x74;
         uint8_t edidMapAddress = 0;
@@ -88,6 +94,33 @@ namespace libusb {
         fprintf(stderr, "Unrecognised board state (ADV7604 EDID map 0x%02X, PCA9539A config %02X %02X)\n",
                 edidMapAddress, pcaConfig[0], pcaConfig[1]);
         return BoardState::Unknown;
+    }
+
+    void Bootstrapper::reportCryptoAttemptCounters() {
+        // The GC550's AT88SC CryptoMemory (checked by the Windows driver) permanently locks a key
+        // or password set after a few failed attempts. The bootstrap no longer authenticates, so
+        // these counters should never change under this driver; print them so that can be checked.
+        // A key set counter is FF when unused and steps FF -> EE -> CC -> 88 -> 00 (locked).
+        _bridge.drainResponses();
+        constexpr struct { uint8_t address; const char *name; } COUNTERS[] = {
+            {0x50, "key set 0"}, {0x60, "key set 1"}, {0x70, "key set 2"},
+            {0xB0, "password 0"}, {0xB8, "password 1"}, {0xC0, "password 2"}, {0xD0, "password 4"},
+        };
+        std::string line;
+        for (const auto &counter : COUNTERS) {
+            uint8_t value = 0;
+            int res = _bridge.cryptoReadConfig(counter.address, &value, 1);
+            if (res != LIBUSB_SUCCESS) {
+                fprintf(stderr, "Could not read the anti-clone chip's %s counter (%s on %s)\n", counter.name,
+                        libusb_error_name(res), _bridge.lastFailure());
+                _bridge.drainResponses();
+                return;
+            }
+            char entry[32];
+            snprintf(entry, sizeof(entry), "%s%s %02X", line.empty() ? "" : ", ", counter.name, value);
+            line += entry;
+        }
+        printf("Anti-clone chip attempt counters (FF = never failed, 00 = locked): %s\n", line.c_str());
     }
 
     void Bootstrapper::setAutoInputColourSpace() {
@@ -112,5 +145,33 @@ namespace libusb {
             return;
         }
         printf("Receiver input colour space: automatic (IO 0x02 0x%02X -> 0x%02X)\n", io02, automatic);
+    }
+
+    void Bootstrapper::resetPictureAdjustment() {
+        // When the Windows driver saw the RGB source used for the capture, it also raised the CP
+        // brightness (CP 0x3C) to 0x0E, and the replay keeps that offset for every source (black
+        // is lifted). Put the CP picture adjustment (contrast, saturation, brightness, hue) back
+        // to the neutral values the bootstrap itself writes, as Linux adv7604.c defaults them.
+        constexpr uint8_t ADV_CP = 0x22;
+        constexpr struct { uint8_t reg; uint8_t neutral; const char *name; } ADJUSTMENTS[] = {
+            {0x3A, 0x80, "contrast"}, {0x3B, 0x80, "saturation"}, {0x3C, 0x00, "brightness"}, {0x3D, 0x00, "hue"},
+        };
+        for (const auto &adjustment : ADJUSTMENTS) {
+            uint8_t value = 0;
+            int res = _bridge.i2cRead(ADV_CP, adjustment.reg, &value, 1);
+            if (res != LIBUSB_SUCCESS) {
+                fprintf(stderr, "Could not read the receiver's %s (%s on %s)\n", adjustment.name,
+                        libusb_error_name(res), _bridge.lastFailure());
+                _bridge.drainResponses();
+                continue;
+            }
+            if (value == adjustment.neutral) continue;
+            if (_bridge.i2cWrite(ADV_CP, adjustment.reg, adjustment.neutral) != LIBUSB_SUCCESS) {
+                fprintf(stderr, "Could not reset the receiver's %s\n", adjustment.name);
+                continue;
+            }
+            printf("Receiver %s: neutral (CP 0x%02X 0x%02X -> 0x%02X)\n", adjustment.name, adjustment.reg, value,
+                   adjustment.neutral);
+        }
     }
 }

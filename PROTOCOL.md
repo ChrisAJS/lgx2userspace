@@ -15,14 +15,18 @@ The device is built around a **Cypress EZ-USB FX3** USB 3.0 controller
 `CRXADV7604::*` (118 methods, incl. `ADIAPI_*`/`HAL_*` from ADI's reference
 code), and the bootstrap stream programs the ADV7604's I2C map addresses and
 EDID RAM (see "Bootstrap command stream" below). The INF's `1:7604` is the
-ADV7604; `0:6604/7002` likely refers to the GC550's ITE IT6603/6604
-(`CVampVDecoderIT6603::*` in the driver). The GC551 also carries a
+ADV7604. `0:6604/7002` may refer to ITE IT6603/6604 parts
+(`CVampVDecoderIT6603::*` in the driver), but the **GC550 (LGX) bootstrap also
+programs an ADV7604** (see "GC550 (LGX) bootstrap" below). The GC551 also carries a
 **PCA9539A** 16-bit GPIO expander (`CPCA9539A::*`) and a separate 4K-capable
 HDMI 2.0 front-end (passthrough path), also found in the bootstrap stream.
 
-The receiver outputs captured video to the FX3 over a **dual-channel 10-bit
-parallel bus (BT.1120)**. BT.1120 carries luma (Y) and chroma (CbCr) on
-separate 10-bit channels at pixel clock, with SAV (Start of Active Video) and
+The receiver outputs captured video to the FX3 over a **dual-channel parallel
+bus (BT.1120 style)**. **Correction:** the channels are **8 bits wide**, not
+10: the bootstrap sets ADV7604 IO 0x03 = `0x80` (OP_MODE_SEL = SDR 4:2:2 ×2,
+OP_FORMAT_SEL = 8-bit; Linux `MEDIA_BUS_FMT_*8_1X16`), which matches the 2
+bytes per pixel of YUY2 on the wire. BT.1120 carries luma (Y) and chroma (CbCr) on
+separate channels at pixel clock, with SAV (Start of Active Video) and
 EAV (End of Active Video) timing reference preambles on both channels
 simultaneously. The preamble sequence on each channel is: `3FF 000 000 XY`,
 where `XY` encodes field, blanking, and H-sync status.
@@ -32,6 +36,10 @@ translates them into the `0xCxFFFF00` USB stream markers described below. The
 `FF FF` in every marker directly corresponds to the two `3FF` preamble words
 (one per channel, upper 8 bits = `0xFF`) arriving simultaneously on the
 parallel bus. This connection explains the entire sub-chunk framing structure.
+One caveat: the bootstrap sets IO 0x05 = `0x2C` (AV-code insertion on, but
+**replicate_av_codes off**), which per the Linux driver puts the codes on one
+channel only. So the second `FF` may be added by the FX3 rather than arrive
+on both channels (unverified).
 
 **Correction:** the bootstrap does not upload FX3 firmware or images. The BMP
 files shipped alongside the driver (`aver_custom_no_signal.bmp`,
@@ -329,8 +337,8 @@ is device-driven:
     `(channel, register, value)` records (e.g. `DAT_1400cce30`,
     `DAT_1400ceda0`, `DAT_1400d0030`) walked by small loop functions — these
     are the "command data" payloads of `commanddata_lgx2.h`. They program the
-    ITE receiver (input/output format, BT.1120 dual-channel output, timing);
-    once configured, streaming is continuous.
+    ADV7604 receiver (input/output format, dual-channel output, timing) and
+    the HDMI 2.0 front-end; once configured, streaming is continuous.
   - *Mode changes* use per-resolution register tables
     (`CVX8897::REG_1920_1080_60P_422_To_...`, `TvParmFlagChanged`).
   - *Status reads* (HdmiSyncInfo / Vsync / Hsync / AVI info frames) are
@@ -341,8 +349,8 @@ is device-driven:
 
 **Replication implication:** keep N large read URBs outstanding and parse
 continuously — no per-frame or per-transfer command is required. The only
-commands that affect *timing* are the bootstrap writes that put the ITE chip
-into continuous BT.1120 output mode.
+commands that affect *timing* are the bootstrap writes that put the ADV7604
+into continuous dual-channel output mode.
 
 ### Stall & desync behaviour (driver-verified)
 
@@ -401,8 +409,9 @@ Addresses are **7-bit I2C**.
 | `0E 02 07 FE 02 00` + `<512` | Non-I2C bridge command, first in the stream; reads 512 bytes (meaning unknown — device/firmware info?) |
 | `14` | Non-I2C bridge command, single byte, issued once mid-stream (cmd #7732, right after the passthrough chip's TX blocks are reconfigured). Unknown — candidate for "start/arm video path" |
 
-(The GC550 stream in `commanddata_lgx.cpp` uses additional opcodes `05`–`08`,
-not decoded.)
+(The GC550 stream in `commanddata_lgx.cpp` also used opcodes `05`/`06`/`07`/`09`
+to talk to an AT88SC CryptoMemory chip, plus `08`; see "GC550 (LGX)
+bootstrap" below.)
 
 ### I2C devices addressed
 
@@ -422,22 +431,156 @@ not decoded.)
 The exact front-end part number is not identified (an ITE IT666x-family 1→N
 HDMI 2.0 splitter with down-scaler fits the topology — unconfirmed).
 
-### Sequence overview
+### Sequence overview (cross-referenced with Linux `adv7604.c`)
 
-1. `0E` bridge query; `0x65` setup; PCA9539A reset pulse.
-2. ADV7604 map-address setup → **EDID #1** written to ADV EDID RAM, then
-   ADI's eval default **EDID #2** (from the ADI reference `HardwareInit`), then
-   reset + map setup + EDID #1 again; HPD / termination via repeater map.
-3. ADV7604 mode: IO `00=02` (VID_STD), `01=06` (PRIM_MODE = HDMI-graphics,
-   V_FREQ 60 Hz), `02=F8/FC` (input colour-space auto, output config),
-   `03=80` (output bus format), `05=2C` (incl. AV-code insertion — the SAV/EAV
-   codes that become the stream markers), `06=A0`, `15=A0` (pixel/sync
-   outputs un-tristated), plus CP picture adjust (`3A–3E`).
-4. FPGA (`0x10`) and HDMI 2.0 front-end (`0x2C/0x58/0x4B/0x44–47`) init,
-   **EDID #3** (4K) to `0x6C`, TX blocks configured, `14` bridge command.
-5. Remainder (from cmd ~2,400 on): the driver's **periodic status polling**,
-   see "Runtime polling" below. Replaying it once at startup is a frozen
-   snapshot of a loop, not initialisation.
+Command numbers count I2C transactions (a write, or a read with its reply)
+from the start of the LGX2 string, as printed by `utils/decode_bootstrap.py`.
+Most ADV7604 steps match the Linux `adv7604.c` driver register for register.
+
+| Cmd # | Step | Linux / ADI equivalent |
+|---|---|---|
+| 0–22 | `0E` bridge query; `0x65` setup; PCA9539A port 0 configured as outputs, output reg `0x02` pulsed `71→31→71` | Bit 6 (P0.6) is very likely the **ADV7604 RESET pin**: each pulse is followed by rewriting every sub-map address, which a chip reset returns to defaults. There is no software reset (IO `0xFF`) anywhere in the stream. |
+| 23–46 | IO `0xF3–0xFE` = sub-map I2C addresses (8-bit form) | `adv76xx_write_i2c_addresses`; Linux's defaults except TEST (`0x29`) |
+| 47–49 | IO `0x0C=60` (powered down), read IO `0x11` (revision) | |
+| 50–307 | REP `0x77=01`; **EDID #1** written one byte at a time | |
+| 308–333 | HDMI `0x01=78` (termination off), REP `0x77=00` (EDID off the DDC bus), **EDID #2** in 32-byte blocks, EDID `0xAC/0xAD = 10 00` | `adv7604_set_termination(false)` + `adv76xx_set_edid`: CEC physical address 1.0.0.0 at offset 0xAC |
+| 334–355 | REP `0x76=AC` (SPA location), REP `0x70–0x75` = `20 00 30 00 40 00` (ports B/C/D → 2.0.0.0 / 3.0.0.0 / 4.0.0.0), REP `0x77` 01→03→07→0F→00 | `adv76xx_set_edid` (`edid_spa_loc_reg`, `edid_spa_port_b_reg`, `edid_enable_reg`) |
+| 364–404 | **Second reset pulse**, map addresses again, IO `0x0C=60` | |
+| 405–660 | **EDID #1** again (byte by byte) | |
+| 661–679 | HDMI `0x00=00` (port A), HDMI `0x01=70` (termination on, port A) | `enable_input` / `adv7604_set_termination(true)` |
+| 680–691 | IO `0x0C=40→42`, IO `0x0B=44`, IO `0x01=06`, IO `0x00=02` | `adv76xx_core_init`: "power up part, power down VDP", "power down ESDP"; HDMI-graphics auto mode (VID_STD 2, PRIM_MODE 6, 60 Hz), as in `configure_custom_video_timings` |
+| 692–712 | HDMI `0D=84 3D=10 3E=39 4E=3B 57=B6 58=03 8D=18 8E=34 93=8B 94=2D 96=01`, plus `9D=01` | Exactly `adv7604_recommended_settings_hdmi` (ADI "Register Settings Recommendations" rev 2.5); `0x9D` is extra |
+| 694–701 | IO `0x15` BC→B8→B0→A0 | "Disable tristate of pins", one group at a time (`BE` = all tristated) |
+| 713–720 | HDMI `48=06 14=1D 1A=40`; CP `CF=01`; AFE `01=2E 0C=1F 12=7B C8=40` | CP `0xCF` = "power down macrovision". The AFE `0C`/`12` values are Linux's *analog* recommendations, not the HDMI ones (`0D`/`FB`) |
+| 721–737 | Poll IO `0x6A` / `0x6F` | Wait for TMDS clock and +5V (`no_signal_tmds`, `read_cable_det`) |
+| 738–754 | IO `07=40`, AFE `02=00`, CP `85=03`, REP `40=80`, AFE `C6=7F` | Not in the Linux driver |
+| 755–1561 | Interrupt masks IO `0x64 0x69 0x6E 0x73 0x78 0x7D 0x82 0x50` and `0x41 0x46 0x4B 0x5F` rewritten repeatedly, unmasking more bits each pass (`0x64`: 00→02→03→…→F7; `0x73`: 00→01→1F) | ADI's `TvIsr` loop running. Linux sets them once (`0x46=98`, `0x6E=C1`, `0x73=1E`). The INT pin is not known to reach the host, so these probably only affect which status bits latch |
+| 1562–1587 | HDMI `02=00`, `03=18`; CP `69=10→30`, CP `68=F0` | CP `0x69=30` = "enable CP CSC" (`adv76xx_core_init`) |
+| 1588–1608 | IO `0x02` F0→F8→FC | Input colour space **automatic** (`F`), alt_gamma = 1, op_656_range = 1 (limited range output), YCbCr out |
+| 1609–1622 | IO `03=80`, `04=42`, `30=88`, `05=2C`, `06=A0` | `adv76xx_setup_format` / `core_init`: SDR 4:2:2 ×2 at 8 bits; OP_CH_SEL `010` (board wiring) and XTAL_FREQ_SEL 28.636 MHz; blank data + AV-code insertion, no replication, no Cb/Cr swap; HS/VS/LLC not inverted |
+| 1623–1638 | IO `15=A0`, `DD=00`, `08` 34→3C→3F | IO `0x08` / `0xDD` are not in the Linux driver |
+| 1639–1652 | CP `41=0A`, `3E=80`, `3C=00`, `3A=80`, `3D=00`, `3B=80` | Video adjust enable; contrast / saturation / brightness / hue at neutral (`adv76xx_s_ctrl`) |
+| 1653–1730 | FPGA (`0x10`) init, `0x65` again, PCA9539A `0x02` = 73 then 77 (bits 1 and 2 on, probably powering the front-end), output format written again | |
+| 1735–~2200 | HDMI 2.0 front-end (`0x2C/0x58/0x4B/0x44–47`) init, **EDID #3** (4K) to `0x6C`, TX blocks configured | |
+| ~2200–9839 | The driver's **periodic status polling** (see "Runtime polling"); bridge command `14` at #7732 | Replaying this at startup is a frozen snapshot of a loop, not initialisation. It also contains the driver's reaction to the source (see below) |
+| 9840–9916 | FPGA `06=01 01=0C 02=02 05=02`; IO `0x02=1C`; IO `0x16=43`; CP `91=50`; CP `8F/90`, `47`, `AB/AC`, `46`, `A2–A7` cleared; CP `7B=05` | The driver re-applying the detected mode: the CP part is `configure_predefined_video_timings` ("reset to default values"). **The capture stops part-way through** (on a read of CP `0xA8`) |
+
+**Source-specific state baked into the replay.** At #6838 (and again at
+#9852/#9871) the polling loop reacts to the RGB source connected during the
+capture (it reads HDMI `0x53`, the HDMI colour space, just before):
+- IO `0x02` `FC` → `18` → `1C`: input colour space fixed to full-range RGB
+  (undone by `setAutoInputColourSpace`, see "Video source compatibility").
+- CP `0x3C` (brightness) `00` → **`0E`**: a +14 brightness offset that lifts
+  black on every source. `Bootstrapper::resetPictureAdjustment` puts CP
+  `0x3A–0x3D` back to the neutral `80 80 00 00` written at #1645–1652.
+
+The bootstrap proper ends around #1730, and nothing before that is specific
+to the source.
+
+### GC550 (LGX) bootstrap
+
+Decoded with `utils/decode_bootstrap.py` against the driver's strings.
+
+**AT88SC CryptoMemory (anti-clone check) — removed from the replay.** The
+recorded GC550 string began (after the `0E` read, `08` and a PCA9539A reset
+pulse) with ~150 non-I2C commands talking to an Atmel AT88SC CryptoMemory.
+The driver class is `CryptoAT88::*`, and `CryptoCheck` logs "Authen user zone
+N failed", "PW user zone N failed", "Comparing failed for user zone N" and
+"Crypto not Initialized or Not our product!!". The CryptoMemory command byte
+takes the place of an I2C address (`B2`–`BA`):
+
+| Command | Meaning |
+|---|---|
+| `B6 00 00 08`, `B6 01 00 01`, `B6 00 0C 04` | Read config zone: answer-to-reset, fuses, card manufacturer code |
+| `B8 00 00 0A` + 16 × `00` | Before each key set; looks like a security reset |
+| `B6 00 n0 08` (n = 5, 6, 7) | Read the attempt counter and cryptogram of key set 0, 1, 2 |
+| `B8 0k 00 10` + 16 bytes | Verify Crypto: **authenticate** with key set k (8-byte host random + 8-byte challenge) |
+| `B8 1k 00 10` + 16 bytes | Verify Crypto: **activate encryption** with key set k |
+| `BA 0p 00 03` + 3 bytes | Verify password set p (2, 0, 1, 4, 4) |
+| `B6 00 Bx/Cx/Dx 01` | Read that password set's attempt counter |
+| `B4 03 0z 00` then `B2 …` | Select user zone z (0–4) and read it (16 bytes; 64 + 4 from zone 4) |
+
+This is the driver's `CryptoCheck` (zones 0–3) plus `GetCryptoSerialNumber`
+(zone 4). Key set 1 was used for zones 0–1, key set 0 for zone 2, and key set 2
+for zones 3–4.
+
+**Why replaying it is harmful (from the AT88SC design; not yet measured).** The
+host's challenge is derived from a secret key and the chip's current
+cryptogram, and the chip replaces its cryptogram after every authentication.
+A recorded challenge therefore matches only the chip it was recorded on, at that
+moment; on any later run it fails. Each failure spends an attempt
+(`FF → EE → CC → 88 → 00`), and at `00` the set is locked for good. One replay
+made 2 failed attempts on key sets 0 and 1 and **6 on key set 2**. With
+encryption not active, the recorded (encrypted) password bytes are also wrong
+and spend password attempts. Once a set is locked, the Windows driver's
+`CryptoCheck` cannot pass, and it gives up ("Not our product"). That fits the
+README's warning that a GC550 used with this project no longer works with the
+official driver. Video works regardless, so the card does not depend on the
+check. The host driver is what enforces it.
+
+The section has therefore been **removed** from `lgx_setup_commands`. Nothing
+else in the GC550 string uses opcodes `05`/`06`/`07`/`09`. Removing it cannot
+unlock a set that is already locked. To check a card, `Bootstrapper` prints
+the attempt counters before bootstrapping. It uses Read Config Zone (`05 B6 00 <addr> 01`,
+`06 01`, which needs no authentication and changes nothing) at `0x50`/`0x60`/`0x70`
+(key sets 0–2) and `0xB0`/`0xB8`/`0xC0`/`0xD0` (password sets 0, 1, 2, 4).
+`FF` means never failed. The address layout is from the AT88SC datasheet and
+matches the reads in the recording.
+
+**Hardware results.**
+- A GC550 that had been used with the old replay reads `00` for every key set
+  and password set (all locked). That is what the analysis above predicts.
+- A pristine GC550 reads all `FF`, and still reads all `FF` after two full
+  bootstraps with the stripped string. So the new bootstrap spends no attempts.
+- Video and audio work without the CryptoMemory section, so the card does not
+  need it.
+- **Not yet confirmed:** that the pristine card still works with the Windows
+  driver afterwards.
+
+**Reuse and status poll on the GC550 (hardware-verified, on the locked card).**
+- Board-state detection recognises a configured GC550 and reuses its
+  configuration without an error.
+- The status poll takes 7–8 ms per poll while streaming. It reports
+  1080p59.90 and the source's colour format (RGB, read from `0x46`), and it
+  follows unplug and replug: no signal, no cable, then signal again.
+- The buffer order **changes with the signal** on the GC550: normal → swapped
+  just after starting on a reused configuration, back to normal as the signal
+  dropped, and swapped again when it returned. Each change was detected and
+  the stream recovered to 60 fps. This fits the ping-pong / lost-buffer
+  explanation under "Swapped DMA buffer order": an interruption in the
+  receiver's output appears to flip the pairing. The frames dropped while
+  each new order is decided are the likely cause of a brief wobble at start.
+
+**Other GC550 devices.**
+
+| 7-bit addr | Device | Evidence |
+|---|---|---|
+| `0x20` + maps | **ADV7604** | Same map layout as the GC551 (IO `0xF3–0xFE`), except the InfoFrame map at `0x46` (`F5=8C`), which is why `0x46` is the most-polled address. Same output format (IO `03=80 04=42 05=2C`) |
+| `0x3D` | **ADV7511 HDMI transmitter** (passthrough output, very likely) | ADV7511 "fixed registers" `98=03 9A=E0 9C=30 9D=61 A2=A4 A3=A4 E0=D0` (as Linux `adv7511_fixed_registers`), power-up `41` 50→10, audio N = `001880` then `001800` (6272 / 6144: the 44.1 kHz and 48 kHz values), polls `42` (HPD), `96/97` (interrupts), `9E`, `AF`. So GC550 passthrough is re-transmitted from the capture path rather than split |
+| `0x18` | Probably a **TI TLV320AIC3x audio codec** (analog audio input) | Its fixed address; writes match the PLL (`03=91 04=10`), serial interface (`08=C0 09=30`) and line-in/ADC gain and routing (`0F/10=0D`, `13/16=1C`, `15/18=78`) registers |
+| `0x4A` | Unknown, probably an audio mixer/volume chip | Registers `06–5F` written once, most to `0x3F` (6-bit gain/mute) |
+| `0x3F` | Unknown | Only read, once each at `00, 20, …, E0` |
+| `0x74`, `0x10`, `0x65` | PCA9539A, FPGA, unknown | As on the GC551 |
+
+**Source-specific leftovers.** As on the GC551, the replay ends with the
+ADV7604 set for the recorded source. IO `0x02=1C` fixes the input to
+full-range RGB. IO `0x00=08` with `0x01=06` is HDMI-graphics standard `0x08`,
+640×480p60, which matters for the free-run picture (the GC551 uses `0x02`, auto).
+IO `0x06=A6` inverts the HS/VS outputs (GC551: `A0`; this may be board wiring).
+CP brightness moves (`F0`) but ends at `00`. `setAutoInputColourSpace` and
+`resetPictureAdjustment` now run for both cards.
+
+### Resetting the ADV7604 (unverified)
+
+The PCA9539A pulse suggests the host can hard-reset the receiver at any time
+(`0x74` reg `0x02` bit 6 low, then high). A reset loses everything set from
+#23 onward: the map addresses, EDID RAM (so hot-plug drops and the source
+re-negotiates), termination, the output format, and the tristate release. To
+recover, replay #23–#1652 (or a trimmed equivalent). It is unlikely to reset
+the FX3's DMA buffering, which is where the swapped-pair state lives (see
+"Swapped DMA buffer order"). It has not been tried; a safe first test is to
+read IO `0xFA` (`0x6C` once configured), pulse, and read it again (`0x00`
+would confirm the pin).
 
 ### EDIDs written
 
@@ -501,7 +644,8 @@ been reconfigured for the detected Resolution", `AssertHpdAndTerm`,
 handles the passthrough ports.
 
 **Userspace status poll.** `UsbStream` now runs a read-only poll every 50 ms
-(`statusPollLoop`, GC551 only, disable with `LGX2_NO_STATUS_POLL`). It started at
+(`statusPollLoop`, both cards, disable with `LGX2_NO_STATUS_POLL`; the GC550's
+AVI InfoFrame is read from its InfoFrame map at `0x46` instead of `0x3E`). It started at
 200 ms, like the ADV7604 thread, and was lowered to match the driver's fastest
 (front-end) poll, because it now also drives audio muting and video blanking
 on signal loss. It also reads IO 0x02/0x60 and AVI InfoFrame byte 1. It reads IO
@@ -556,15 +700,19 @@ reads `Lh·256+Ll` bytes from a memory address. The bootstrap's
 driver later tests capability bits in a 0x20-byte config block). `0D` is
 the matching write, and `15`/`16` are single-byte variants of `0D`/`0E`.
 `05`/`06`/`07` (GC550 only) are a 1-byte-prefixed write / read / write with
-8 ms stalls. `09 x` and `0B a b c` are short writes. `08` and `14` take no
+8 ms stalls: the CryptoMemory 2-wire transport (`05` = command header, `06 N`
+= read N bytes, `07` = data). `09 x` and `0B a b c` are short writes (`09 0A`
+follows every CryptoMemory write, probably a 10 ms write-cycle wait). `08` and `14` take no
 arguments and are reached only through a virtual method table, so their
 meaning is not yet traced.
 
 **Detecting an already-bootstrapped board (userspace).** The configuration
 survives a USB reset (including the `libusb_reset_device` at shutdown) and is
 only lost on unplug. Re-running the bootstrap on a configured board is what
-produced garbage output. `Bootstrapper::detectLgx2BoardState` reads two
-bus-powered chips that a USB reset leaves alone:
+produced garbage output. `Bootstrapper::detectBoardState` reads two
+bus-powered chips that a USB reset leaves alone (on both cards: the GC550
+bootstrap sets the same values; its power-up expander value has not been
+observed, but a fresh card is identified by the EDID map alone):
 - **ADV7604 IO 0xFA** (EDID map address): reset value `0x00`; the bootstrap
   sets it to `0x6C`.
 - **PCA9539A (0x74) configuration registers 0x06/0x07**: `00 89` on a
@@ -583,6 +731,10 @@ The decision:
 
 (The first version tested the expander for `FF FF`, which never matched on
 real hardware; cold plugs only worked through the fallback.)
+
+On the GC550 the reuse path is untested on hardware. Until it was added, a
+second run without unplugging always ended in the IN 0x83 fallback's "already
+been bootstrapped" error.
 
 **Hardware result: reuse works intermittently.** In one test the first reuse
 after a clean session gave good video. The next reuse gave **audio but no
@@ -712,7 +864,8 @@ The colour, however, is a strong uniform green:
 - Cb and Cr sit around 109, never exceed 128, and are almost exact linear
   functions of luma (fit residual ≈ 1.5 levels). The chroma information is
   gone, so software post-processing cannot recover it.
-- **Cause:** the replayed bootstrap leaves ADV7604 IO 0x02 at `0x1C`. Bits
+- **Cause:** the replayed bootstrap leaves ADV7604 IO 0x02 at `0x1C` (set by the
+  recorded polling loop, not the init itself, which writes `0xFC`). Bits
   7:4 = `0x1` mean the input colour space is fixed to **full-range RGB**:
   correct for the source the Windows capture was taken with (the Switch
   outputs RGB), wrong for a YCbCr camera. The Windows driver picks this per
@@ -772,7 +925,10 @@ via the driver API or device firmware would allow correct RGB ingestion.
 
 - **GC550 (LGX) differences.** The INF shares most settings between GC550 and
   GC551 but some keys differ (e.g. `USB3ANALOG` vs `USB3ANALOG_GC551`). No
-  stream-level testing has been done on a GC550.
+  stream-level testing has been done on a GC550. Whether the CryptoMemory
+  section can be dropped without upsetting the card, and whether that keeps
+  the Windows driver working, is still to be confirmed on hardware (see
+  "GC550 (LGX) bootstrap").
 
 - **STRHEADER_FLAG.** The INF sets this to 0 for both GC550 and GC551. Its
   precise effect on the USB stream header layout is unknown.

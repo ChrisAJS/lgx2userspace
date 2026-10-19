@@ -25,6 +25,10 @@ namespace libusb {
         int i2cRead(uint8_t address, uint8_t reg, uint8_t *out, uint8_t count);
         int i2cWrite(uint8_t address, uint8_t reg, uint8_t value);
 
+        // GC550 only: read `count` bytes at `address` of the AT88SC CryptoMemory configuration
+        // zone (Read Config Zone, B6), which needs no authentication and changes nothing.
+        int cryptoReadConfig(uint8_t address, uint8_t *out, uint8_t count);
+
         // Discard any replies waiting in IN 0x81, so the next reply is not attributed to the
         // wrong request.
         void drainResponses();

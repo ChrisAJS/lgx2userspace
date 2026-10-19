@@ -54,6 +54,44 @@ namespace libusb {
         return actualLength == static_cast<int>(sizeof(request)) ? LIBUSB_SUCCESS : LIBUSB_ERROR_IO;
     }
 
+    int CommandBridge::cryptoReadConfig(uint8_t address, uint8_t *out, uint8_t count) {
+        std::lock_guard<std::mutex> lock(_mutex);
+
+        // As recorded from the Windows driver (see PROTOCOL.md, "GC550 CryptoMemory"): 05 sends
+        // the 4-byte CryptoMemory command <cmd> <p1> <p2> <N> without a reply, then 06 <N> clocks
+        // in N bytes, answered on IN 0x81.
+        uint8_t command[] = {0x05, 0xB6, 0x00, address, count};
+        uint8_t readRequest[] = {0x06, count};
+        int actualLength = 0;
+
+        _lastFailure = "command (OUT 0x01)";
+        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, command, sizeof(command), &actualLength,
+                                       COMMAND_TIMEOUT_MS);
+        if (res != LIBUSB_SUCCESS) return res;
+        if (actualLength != static_cast<int>(sizeof(command))) return LIBUSB_ERROR_IO;
+
+        _lastFailure = "read request (OUT 0x01)";
+        res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, readRequest, sizeof(readRequest), &actualLength,
+                                   COMMAND_TIMEOUT_MS);
+        if (res != LIBUSB_SUCCESS) return res;
+        if (actualLength != static_cast<int>(sizeof(readRequest))) return LIBUSB_ERROR_IO;
+
+        _lastFailure = "reply (IN 0x81)";
+        uint8_t reply[COMMAND_MAX_PACKET];
+        res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x01, reply, sizeof(reply), &actualLength,
+                                   COMMAND_TIMEOUT_MS);
+        if (res == LIBUSB_ERROR_PIPE) {
+            libusb_clear_halt(_dev, LIBUSB_ENDPOINT_IN | 0x01);
+        }
+        if (res != LIBUSB_SUCCESS) return res;
+        if (actualLength != count) {
+            _lastFailure = "reply (IN 0x81, unexpected length)";
+            return LIBUSB_ERROR_IO;
+        }
+        memcpy(out, reply, count);
+        return LIBUSB_SUCCESS;
+    }
+
     void CommandBridge::drainResponses() {
         std::lock_guard<std::mutex> lock(_mutex);
         drainResponsesLocked();
