@@ -20,6 +20,7 @@ namespace lgx2 {
         s.poweredDown = regs.io0c & 0x24;
         s.hdmiMode = h[0] & 0x80;
         s.interlaced = regs.io12 & 0x10;
+        s.hdcpEncrypted = (s.hdmiMode && (h[0] & 0x40)) || (regs.haveFrontEnd && (regs.frontEndRxCF & 0x20));
         s.inputColourSpace = regs.io02 >> 4;
         if (s.hdmiMode && (regs.io60 & 0x01)) {
             static constexpr ColourFormat FORMATS[4] = {ColourFormat::RGB, ColourFormat::YCbCr422,
@@ -67,6 +68,7 @@ namespace lgx2 {
 
     std::string SignalStatus::describe() const {
         if (!cableDetected) return "no cable";
+        if (hdcpEncrypted) return "HDCP-protected source (not captured)";
         if (!signalPresent()) return "cable connected, no signal";
 
         static const char *FORMAT_NAMES[] = {"format unknown", "RGB", "YCbCr 4:2:2", "YCbCr 4:4:4", "YCbCr 4:2:0"};
@@ -89,7 +91,8 @@ namespace lgx2 {
         // Equality means "would be reported the same": timing registers are meaningless without
         // a signal, and the pixel clock is compared to 0.25 MHz (the register's resolution), so
         // measurement noise is not reported as a change.
-        if (cableDetected != other.cableDetected || signalPresent() != other.signalPresent()) return false;
+        if (cableDetected != other.cableDetected || signalPresent() != other.signalPresent() ||
+            hdcpEncrypted != other.hdcpEncrypted) return false;
         if (!signalPresent()) return true;
         return hdmiMode == other.hdmiMode &&
                interlaced == other.interlaced &&

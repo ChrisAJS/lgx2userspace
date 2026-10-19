@@ -95,6 +95,44 @@ TEST_CASE("Cable without lock reports no signal") {
     CHECK(s.describe() == "cable connected, no signal");
 }
 
+TEST_CASE("HDCP-encrypted input is reported as protected") {
+    SECTION("ADV7604 receiving encrypted content directly (GC550)") {
+        AdvStatusRegisters r = locked1080p60();
+        r.hdmi05to0c[0] |= 0x40;
+        SignalStatus s = SignalStatus::decode(r);
+        CHECK(s.hdcpEncrypted);
+        CHECK(s.describe() == "HDCP-protected source (not captured)");
+    }
+
+    SECTION("IT6664 front-end holding back an encrypted input (GC551: the ADV7604 sees no signal)") {
+        AdvStatusRegisters r = locked1080p60();
+        r.io6a = 0x00;
+        r.haveFrontEnd = true;
+        r.frontEndRxCF = 0xA0;
+        SignalStatus s = SignalStatus::decode(r);
+        CHECK(s.hdcpEncrypted);
+        CHECK_FALSE(s.signalPresent());
+        CHECK(s.describe() == "HDCP-protected source (not captured)");
+    }
+
+    SECTION("Unencrypted front-end input and DVI are not protected") {
+        AdvStatusRegisters r = locked1080p60();
+        r.haveFrontEnd = true;
+        r.frontEndRxCF = 0x80;
+        CHECK_FALSE(SignalStatus::decode(r).hdcpEncrypted);
+
+        r.hdmi05to0c[0] = 0x40; // bit 6 without HDMI mode is not read as HDCP
+        CHECK_FALSE(SignalStatus::decode(r).hdcpEncrypted);
+    }
+}
+
+TEST_CASE("A change in HDCP encryption is reported") {
+    AdvStatusRegisters r = locked1080p60();
+    SignalStatus clear = SignalStatus::decode(r);
+    r.hdmi05to0c[0] |= 0x40;
+    CHECK(clear != SignalStatus::decode(r));
+}
+
 TEST_CASE("Deep colour and pixel repetition divide the TMDS clock") {
     AdvStatusRegisters r = locked1080p60();
     r.hdmi05to0c[1] = 185;           // 185.625 MHz TMDS = 148.5 MHz at 10 bpc

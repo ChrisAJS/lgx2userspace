@@ -87,7 +87,8 @@ cmake --build build
 
 | Variable | Description |
 |---|---|
-| `LGX2_NO_STATUS_POLL` | Set to any value to disable the HDMI input status poll. By default the card (LGX2 or LGX) is polled every 50 ms and changes are printed, e.g. `HDMI input: 1920x1080p @ 60.00 Hz (148.50 MHz, HDMI, YCbCr 4:2:2; receiver input colour space auto)` or `HDMI input: no cable`. The poll also mutes audio and blanks video while there is no signal; without it, nothing is muted. |
+| `LGX2_NO_STATUS_POLL` | Set to any value to disable the HDMI input status poll. By default the card (LGX2 or LGX) is polled every 50 ms and changes are printed, e.g. `HDMI input: 1920x1080p @ 60.00 Hz (148.50 MHz, HDMI, YCbCr 4:2:2; receiver input colour space auto)` or `HDMI input: no cable`. The poll also mutes audio and blanks video while there is no signal, or while the source sends HDCP-protected video (reported as `HDMI input: HDCP-protected source (not captured)`; protected video is never captured, matching the official driver); without it, nothing is muted. |
+| `LGX2_FRONTEND_DEBUG` | LGX2 (GC551) only, diagnostic: also print the HDMI 2.0 front-end's (IT6664) status registers whenever they change. Read only. See PROTOCOL.md, "IT6664 front-end and HDCP (GC551)". |
 | `LGX2_DUMP_FILE` | Path to write the first 128 raw USB chunks to, for offline stream analysis. |
 
 ## Setup
@@ -120,6 +121,12 @@ it is undocked and re-docked.
 ### Common issues
 On occasion the LGX or LGX2 will fail to retrieve full frames. It may be required to unplug and re-plug the HDMI cable
 into the input of the device.
+
+**HDCP-protected sources are not captured.** Some sources encrypt their output with HDCP; a MacBook does this even for
+its desktop. As with the official driver, such video is never captured: you will see an "HDCP PROTECTED" screen and
+`HDMI input: HDCP-protected source (not captured)`. On the LGX2 (GC551), its HDMI front-end then stays locked in this
+state even after you connect a different source: **unplug and replug the LGX2's USB cable** before using another source.
+(The LGX (GC550) has no such front-end and should recover as soon as the protected source is disconnected.)
 
 If you attempt to run the application and it exits immediately, look at the error output, it may help diagnose the issue,
 which will likely be that you haven't installed the udev rules required to give your user permission to access the LGX or

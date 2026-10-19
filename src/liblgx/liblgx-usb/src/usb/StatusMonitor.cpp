@@ -1,18 +1,22 @@
 #include "StatusMonitor.h"
 
 #include <cstdio>
+#include <cstdlib>
 
 namespace libusb {
 
     namespace {
         lgx2::InputState inputStateOf(const lgx2::SignalStatus &status) {
+            if (status.cableDetected && status.hdcpEncrypted) return lgx2::InputState::Protected;
             if (status.signalPresent()) return lgx2::InputState::Signal;
             return status.cableDetected ? lgx2::InputState::NoSignal : lgx2::InputState::NoCable;
         }
     }
 
     StatusMonitor::StatusMonitor(CommandBridge &bridge, lgx2::DeviceType deviceType)
-            : _bridge{bridge}, _infoFrameAddress{static_cast<uint8_t>(deviceType == lgx2::DeviceType::LGX2 ? 0x3E : 0x46)} {
+            : _bridge{bridge}, _infoFrameAddress{static_cast<uint8_t>(deviceType == lgx2::DeviceType::LGX2 ? 0x3E : 0x46)},
+              _hasFrontEnd{deviceType == lgx2::DeviceType::LGX2},
+              _frontEndDebug{_hasFrontEnd && std::getenv("LGX2_FRONTEND_DEBUG") != nullptr} {
     }
 
     StatusMonitor::~StatusMonitor() {
@@ -34,6 +38,8 @@ namespace libusb {
             _inputState = inputStateOf(status);
             printf("HDMI input (before streaming): %s (status read took %lld ms)\n",
                    status.describe().c_str(), static_cast<long long>(ms));
+            reportHdcpLock(status, regs);
+            reportFrontEnd();
         } else {
             fprintf(stderr, "HDMI input status read before streaming failed: %s on %s after %lld ms\n",
                     libusb_error_name(res), _bridge.lastFailure(), static_cast<long long>(ms));
@@ -100,12 +106,61 @@ namespace libusb {
                            static_cast<long long>(pollMs));
                     lastStatus = status;
                     haveStatus = true;
+                    reportHdcpLock(status, regs);
                 }
+                reportFrontEnd();
             }
 
             lock.lock();
             _wake.wait_for(lock, POLL_INTERVAL, [this] { return _stopping.load(); });
         }
+    }
+
+    void StatusMonitor::reportHdcpLock(const lgx2::SignalStatus &status, const lgx2::AdvStatusRegisters &regs) {
+        // On the GC551 the IT6664 front-end stays locked after an HDCP-encrypted source: its
+        // encryption flag stays set and it does not pass the next source on until the card is
+        // power-cycled (see PROTOCOL.md, "IT6664 front-end and HDCP (GC551)").
+        if (_reportedHdcpLock || !regs.haveFrontEnd || !status.hdcpEncrypted) return;
+        _reportedHdcpLock = true;
+        printf("The LGX2 stays in this state after an HDCP-protected source, even once another source is "
+               "connected. Unplug and replug its USB cable to use another source.\n");
+    }
+
+    void StatusMonitor::reportFrontEnd() {
+        if (!_frontEndDebug) return;
+        // The registers the Windows driver polls most on the front-end (see PROTOCOL.md,
+        // "Runtime polling"); their meaning is not decoded yet. Read only: interrupt flags are
+        // cleared by writes, which this never does. RX 0x0F looks like a bank select, so it is
+        // shown too (the bootstrap leaves it at 00).
+        constexpr struct { uint8_t address; const char *name; uint8_t regs[16]; int count; } BLOCKS[] = {
+            {0x2C, "master", {0x05, 0x0A}, 2},
+            // RX 0xCF bit 5: input HDCP-encrypted (the driver checks it on RX interrupt 0x09 bit 2).
+            {0x58, "rx", {0x0F, 0x09, 0x10, 0x12, 0x13, 0x14, 0x15, 0x19, 0x1A, 0x1B, 0x1D, 0x23, 0x48, 0x99, 0x9A, 0xCF}, 16},
+            // TX 0x41 bit 0: the port's HDCP authentication with its sink is done (per the driver).
+            {0x44, "tx0", {0x03, 0x07, 0x28, 0x41}, 4},
+            {0x45, "tx1", {0x03, 0x07, 0x28, 0x41}, 4},
+            {0x46, "tx2", {0x03, 0x07, 0x28, 0x41}, 4},
+            {0x47, "tx3", {0x03, 0x07, 0x28, 0x41}, 4},
+        };
+        std::string line;
+        for (const auto &block : BLOCKS) {
+            line += line.empty() ? "" : " |";
+            line += " ";
+            line += block.name;
+            for (int i = 0; i < block.count; i++) {
+                uint8_t value = 0;
+                if (_bridge.i2cRead(block.address, block.regs[i], &value, 1) != LIBUSB_SUCCESS) {
+                    _bridge.drainResponses();
+                    return;
+                }
+                char entry[16];
+                snprintf(entry, sizeof(entry), " %02X=%02X", block.regs[i], value);
+                line += entry;
+            }
+        }
+        if (line == _lastFrontEnd) return;
+        _lastFrontEnd = line;
+        printf("Front-end:%s\n", line.c_str());
     }
 
     int StatusMonitor::readAdvStatus(lgx2::AdvStatusRegisters &regs) {
@@ -127,6 +182,10 @@ namespace libusb {
         if ((res = _bridge.i2cRead(ADV_HDMI, 0x05, regs.hdmi05to0c, sizeof(regs.hdmi05to0c))) != LIBUSB_SUCCESS) return res;
         if ((res = _bridge.i2cRead(ADV_HDMI, 0x20, regs.hdmi20to25, sizeof(regs.hdmi20to25))) != LIBUSB_SUCCESS) return res;
         if ((res = _bridge.i2cRead(ADV_HDMI, 0x2A, regs.hdmi2ato35, sizeof(regs.hdmi2ato35))) != LIBUSB_SUCCESS) return res;
-        return _bridge.i2cRead(ADV_HDMI, 0x3B, &regs.hdmi3b, 1);
+        if ((res = _bridge.i2cRead(ADV_HDMI, 0x3B, &regs.hdmi3b, 1)) != LIBUSB_SUCCESS) return res;
+        if (!_hasFrontEnd) return LIBUSB_SUCCESS;
+        constexpr uint8_t FRONT_END_RX = 0x58;
+        regs.haveFrontEnd = true;
+        return _bridge.i2cRead(FRONT_END_RX, 0xCF, &regs.frontEndRxCF, 1);
     }
 }

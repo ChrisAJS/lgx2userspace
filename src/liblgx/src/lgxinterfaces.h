@@ -34,6 +34,7 @@ namespace lgx2 {
         Signal,   // usable signal (cable, TMDS lock, timing)
         NoSignal, // cable connected (+5V present) but nothing usable: source off or re-locking
         NoCable,  // no +5V from a source
+        Protected, // the source sends HDCP-encrypted video, which is not captured
         NoDevice  // no capture card attached (only reported by callers that outlive the card)
     };
 

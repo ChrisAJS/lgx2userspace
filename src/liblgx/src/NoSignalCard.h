@@ -7,7 +7,7 @@
 
 namespace lgx2 {
     // A 1920x1080 YUY2 frame saying why there is no picture ("NO SIGNAL", "NO HDMI CABLE",
-    // "NO CAPTURE DEVICE"), for outputs that need real frames rather than drawing their own
+    // "NO CAPTURE DEVICE", "HDCP PROTECTED"), for outputs that need real frames rather than drawing their own
     // screen. Rendered on first use per reason and cached.
     class NoSignalCard {
     public:

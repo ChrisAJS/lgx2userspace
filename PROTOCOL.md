@@ -428,8 +428,8 @@ bootstrap" below.)
 | `0x10` | Probably the Lattice ECP3 FPGA (`CLFE3::*`, "FPGA version = 0x%02X") | reg 00 read first, then small config |
 | `0x65` | Unknown (possibly `CVX8897`) | only `94=6D` and `18=04 01 20 23 8C`, twice |
 
-The exact front-end part number is not identified (an ITE IT666x-family 1→N
-HDMI 2.0 splitter with down-scaler fits the topology — unconfirmed).
+The front-end is an **ITE IT6664** 1→4 HDMI 2.0 splitter (the driver carries
+`IT66642017FEB` / "HDMI2 SPLITER"); see "IT6664 front-end and HDCP (GC551)".
 
 ### Sequence overview (cross-referenced with Linux `adv7604.c`)
 
@@ -569,6 +569,82 @@ full-range RGB. IO `0x00=08` with `0x01=06` is HDMI-graphics standard `0x08`,
 IO `0x06=A6` inverts the HS/VS outputs (GC551: `A0`; this may be board wiring).
 CP brightness moves (`F0`) but ends at `00`. `setAutoInputColourSpace` and
 `resetPictureAdjustment` now run for both cards.
+
+### IT6664 front-end and HDCP (GC551)
+
+From a fresh Ghidra analysis of `avmu3_x64.sys` (no earlier reverse-engineering
+notes reused) plus live register dumps
+(`LGX2_FRONTEND_DEBUG=1` prints the registers below whenever they change).
+
+**Driver class.** The class with vtable `0x1400f97a0` is the IT6664 driver
+(5 entries; data after it is video timing tables). Entry 3 (`FUN_140091090`)
+starts it and arms a 50 ms timer; the tick (`FUN_140090dac`) runs the receiver
+interrupt handler `FUN_14008312c` and the per-port state machine
+`FUN_14008c8dc` for ports 0–3. I2C helpers take 8-bit addresses (`0xB0` =
+receiver `0x58`, `0x58` = master `0x2C`, `0x88 + 2n` = TX port n at `0x44+n`):
+`FUN_140090894` read, `FUN_140090c98` write, `FUN_1400909ac` read-modify-write
+(reg, mask, value), `FUN_14009090c` / `FUN_140090d10` per-port read / write;
+receiver bank select is RX `0x0F` bits 1:0, master bank select `0x0F` bit 0.
+
+**Receiver registers (partly decoded).**
+- `0x05–0x09`, `0x10–0x12`, `0x1A` are latched interrupt flags, cleared by
+  writing back what was read. The bootstrap replay never clears them, so they
+  stay set in our dumps.
+- `0x13` is live input status (`01` with no source, `BF` with a locked one;
+  bit 0 = +5V, bit 6 = HDMI 2.0 mode as used by the driver).
+- **`0xCF` bit 5 = the input is HDCP-encrypted.** The handler checks it on
+  interrupt `0x09` bit 2. When set, it puts every TX port whose `0x41` bit 0
+  (authenticated) is clear into a state that runs HDCP 1.4 authentication
+  towards that port's sink: An copied from TX `0x50–0x57` to `0x48–0x4F`
+  (`FUN_14008fd7c`), BKSV read from `0x5B–0x5F` (`FUN_14008d2bc`), Ri / Ri′
+  compared at `0x58/59` vs `0x60/61` (`FUN_14008d894`).
+- On "input stable" (interrupt `0x10` bit 1 with `0x19` bit 7) the driver
+  starts ports **1 and 2** only (`FUN_14008cfb4`), the two ports that report a
+  sink in our dumps (TX `0x03` = `9F`/`9C`; ports 0 and 3 read `14`).
+
+**Why a MacBook gives "no signal" on the GC551 (hardware-verified).** The Mac
+encrypts its output (rx `CF=A0`, interrupt `09` latched `0C`/`2C`), while the
+Switch does not (`CF=80`). With an encrypted input and unauthenticated ports
+(TX `0x41` bit 0 clear), the IT6664 sends nothing to the ADV7604, which then
+sees +5V but no TMDS clock. Advertising RGB only in the front-end EDID made no
+difference, so the colour format is not the cause. The GC550 has no IT6664:
+its ADV7604 receives the source directly.
+
+**Policy: HDCP-protected input is not captured.** Running the TX
+authentication would let the ADV7604 receive the protected video and this
+software capture it, which would circumvent HDCP. The Windows driver instead
+shows `aver_custom_hdcp_protection.bmp`. For parity, the status poll reads RX
+`0xCF` (GC551) and ADV7604 HDMI `0x05` bit 6 (both cards; "HDCP encrypted
+content" in Linux `adv7604.c`) and reports `HDMI input: HDCP-protected source
+(not captured)`. It blanks video with an "HDCP PROTECTED" card and mutes audio.
+Still open: whether the IT6664 receiver can stop advertising HDCP, so that a
+source like a Mac sends its desktop unencrypted (protected content would then be
+refused by the source itself).
+
+**The GC551 stays locked after an HDCP source (hardware-verified).** Unplugging
+the Mac and connecting a Switch does not recover: RX `CF` stays `A0`, and the
+IT6664 never locks to the Switch (RX `13` stays at `3D`/`01` instead of `BF`).
+Only unplugging the card's USB, which power-cycles it, recovers. The detection
+above therefore keeps reporting "HDCP-protected", which is accurate, and on the
+GC551 the status poll prints a one-time hint to replug the USB cable.
+
+The Windows driver handles this in the receiver interrupt handler. On +5V lost
+it runs `FUN_140087678` (receiver re-init, including a master `0A` bit 2 reset
+pulse) and resets every port (`FUN_14008c8dc`). On +5V arrived it pulses master
+`0C` bit 2 / `10` bit 6 and re-arms the receiver (`FUN_14007f2f8`). On "input
+stable" it brings ports 1 and 2 back up (`FUN_14008cfb4`). Attempts that did
+**not** recover, each triggered when RX `13` bit 0 (+5V) dropped:
+1. Replaying the recording's IT6664 setup (#1735–#2422: unlock, soft reset,
+   ports). This clears `CF`, but the receiver stays at `13=01`. That range also
+   misses the EDID write.
+2. Replaying the whole IT6664 bring-up (#1735–#3755, 1,640 transactions:
+   above plus +5V-arrived handling, EDID composition and write, port 1/2
+   bring-up; ~680 ms). `13` flickers `00/01/21` and never locks.
+3. As 2, preceded by cycling PCA9539A output bits 1 and 2 (`71→73→77`, as at
+   cold start; very likely the IT6664's enable/reset lines).
+
+A real fix would port the IT6664 interrupt handler and per-port state machine,
+driven by the receiver's interrupt flags, rather than replay a recording.
 
 ### Resetting the ADV7604 (unverified)
 
@@ -845,7 +921,9 @@ performs no colourspace conversion. The captured stream is delivered as-is.
 
 ### Sources with colourspace issues
 
-**MacBook / Apple computers** — Apple defaults to outputting HDMI as full-range
+**MacBook / Apple computers** — on the GC551, a Mac encrypts its output with
+HDCP and is reported as `HDCP-protected source (not captured)`; see "IT6664
+front-end and HDCP (GC551)". Colour notes from before that: Apple defaults to outputting HDMI as full-range
 RGB (or full-range YCbCr depending on the display negotiation). Because the
 device interprets all incoming data as limited-range YCbCr, full-range RGB
 sources produce strongly wrong colours (typically an orange/amber tint). This is

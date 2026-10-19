@@ -5,6 +5,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <string>
 #include <thread>
 #include "lgxdevice.h"
 #include "SignalStatus.h"
@@ -42,6 +43,13 @@ namespace libusb {
         // 7-bit I2C address of the ADV7604's InfoFrame map, the one map the two bootstraps place
         // differently.
         uint8_t _infoFrameAddress;
+        // The GC551's input goes through an IT6664 HDMI 2.0 front-end before the ADV7604.
+        bool _hasFrontEnd;
+        // LGX2_FRONTEND_DEBUG (GC551 only): also print the HDMI 2.0 front-end's status registers
+        // whenever they change, to see whether it locks to the source and drives its outputs.
+        bool _frontEndDebug;
+        std::string _lastFrontEnd;
+        bool _reportedHdcpLock{false};
         std::atomic<lgx2::InputState> _inputState{lgx2::InputState::Signal};
 
         std::thread _thread;
@@ -51,6 +59,8 @@ namespace libusb {
 
         void pollLoop();
         int readAdvStatus(lgx2::AdvStatusRegisters &regs);
+        void reportFrontEnd();
+        void reportHdcpLock(const lgx2::SignalStatus &status, const lgx2::AdvStatusRegisters &regs);
     };
 }
 

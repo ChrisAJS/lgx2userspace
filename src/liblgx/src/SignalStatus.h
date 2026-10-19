@@ -30,6 +30,12 @@ namespace lgx2 {
         uint8_t hdmi20to25[6]{};   // H front porch, H sync, H back porch
         uint8_t hdmi2ato35[12]{};  // V front porch, V sync, V back porch (field0/field1, half-lines)
         uint8_t hdmi3b{0};         // bits 5:4 = TMDS frequency fraction (quarter MHz)
+        // HDMI 0x05 bit 6 (in hdmi05to0c[0]) = HDCP-encrypted content (Linux log_status).
+
+        // GC551 only: the IT6664 HDMI 2.0 front-end's receiver (I2C 0x58) register 0xCF, bit 5
+        // = its input is HDCP-encrypted. While it is, the IT6664 sends nothing on to the ADV7604.
+        bool haveFrontEnd{false};
+        uint8_t frontEndRxCF{0};
     };
 
     struct SignalStatus {
@@ -40,6 +46,8 @@ namespace lgx2 {
         bool poweredDown{false};
         bool hdmiMode{false};    // false = DVI
         bool interlaced{false};
+        // The source is sending HDCP-encrypted video. As with the Windows driver, it is not shown.
+        bool hdcpEncrypted{false};
 
         // What the source says it sends (AVI InfoFrame), and what the ADV7604 is set to expect.
         enum class ColourFormat { Unknown, RGB, YCbCr422, YCbCr444, YCbCr420 };
@@ -60,7 +68,8 @@ namespace lgx2 {
         // Frame rate (field rate when interlaced); 0 when unknown.
         double refreshHz() const;
 
-        // e.g. "1920x1080p @ 60.00 Hz (148.50 MHz, HDMI)", "no cable", "cable connected, no signal"
+        // e.g. "1920x1080p @ 60.00 Hz (148.50 MHz, HDMI)", "no cable", "cable connected, no signal",
+        // "HDCP-protected source (not captured)"
         std::string describe() const;
 
         bool operator==(const SignalStatus &other) const;

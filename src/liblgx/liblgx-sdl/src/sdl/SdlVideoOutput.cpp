@@ -120,13 +120,17 @@ namespace sdl {
 
         const bool noCable = _noSignalReason == lgx2::InputState::NoCable;
         const bool noDevice = _noSignalReason == lgx2::InputState::NoDevice;
+        const bool isProtected = _noSignalReason == lgx2::InputState::Protected;
         drawHdmiPlug(w / 2.0f, h * 0.36f, 360.0f * unit, brightness, noCable || noDevice);
 
         SDL_SetRenderDrawColor(_renderer, 235, 235, 235, 255);
-        drawCentredText(noDevice ? "NO CAPTURE DEVICE" : noCable ? "NO HDMI CABLE" : "NO SIGNAL", h * 0.58f, 9.0f * unit);
+        drawCentredText(noDevice ? "NO CAPTURE DEVICE" : noCable ? "NO HDMI CABLE" : isProtected ? "HDCP PROTECTED" : "NO SIGNAL",
+                        h * 0.58f, 9.0f * unit);
 
         SDL_SetRenderDrawColor(_renderer, 150, 150, 160, 255);
-        if (noDevice) {
+        if (isProtected) {
+            drawCentredText("The source is sending copy-protected (HDCP) video, which cannot be captured", h * 0.68f, 3.0f * unit);
+        } else if (noDevice) {
             drawCentredText("Connect the LGX2 to a USB 3 port", h * 0.68f, 3.0f * unit);
         } else if (noCable) {
             drawCentredText("Connect an HDMI source to the LGX2 input", h * 0.68f, 3.0f * unit);

@@ -53,6 +53,8 @@ namespace lgx2 {
                 return "NO HDMI CABLE";
             case InputState::NoDevice:
                 return "NO CAPTURE DEVICE";
+            case InputState::Protected:
+                return "HDCP PROTECTED";
             default:
                 return "NO SIGNAL";
         }
