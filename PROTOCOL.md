@@ -626,7 +626,9 @@ the Mac and connecting a Switch does not recover: RX `CF` stays `A0`, and the
 IT6664 never locks to the Switch (RX `13` stays at `3D`/`01` instead of `BF`).
 Only unplugging the card's USB, which power-cycles it, recovers. The detection
 above therefore keeps reporting "HDCP-protected", which is accurate, and on the
-GC551 the status poll prints a one-time hint to replug the USB cable.
+GC551 the status poll prints a one-time hint to replug the USB cable. The
+GC550, whose ADV7604 receives the source directly, recovers by itself
+(hardware-verified: Mac → Switch goes from HDCP-protected to capturing).
 
 The Windows driver handles this in the receiver interrupt handler. On +5V lost
 it runs `FUN_140087678` (receiver re-init, including a master `0A` bit 2 reset

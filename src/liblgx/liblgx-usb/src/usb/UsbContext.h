@@ -45,11 +45,11 @@ namespace libusb {
         // Whether `device` is a supported card on a USB 3 link; reports why not otherwise.
         static bool usable(libusb_device *device, lgx2::DeviceType &type);
 
-        // Called for each LGX2 that arrives or leaves; cards already attached are reported as
-        // arrivals straight away. Runs on the event thread (or the calling thread, for the initial
+        // Called for each card of `type` that arrives or leaves; cards already attached are reported
+        // as arrivals straight away. Runs on the event thread (or the calling thread, for the initial
         // arrivals), so it must only queue work: opening a device from it is not allowed.
         using HotplugCallback = std::function<void(libusb_device *device, bool arrived)>;
-        void watchDevices(HotplugCallback callback);
+        void watchDevices(lgx2::DeviceType type, HotplugCallback callback);
 
     private:
         libusb_context *_context{nullptr};

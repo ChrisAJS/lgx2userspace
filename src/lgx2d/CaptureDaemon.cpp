@@ -25,6 +25,10 @@ namespace lgx2d {
         _events.clear();
     }
 
+    const char *CaptureDaemon::cardName() const {
+        return _options.deviceType == lgx2::DeviceType::LGX2 ? "LGX2" : "LGX";
+    }
+
     void CaptureDaemon::queueEvent(libusb_device *device, bool arrived) {
         // Runs on the libusb event thread: only queue, the main loop does the work.
         libusb_ref_device(device);
@@ -33,8 +37,9 @@ namespace lgx2d {
     }
 
     void CaptureDaemon::run(const std::atomic<bool> &stop) {
-        printf("Waiting for an LGX2 to be connected\n");
-        _context.watchDevices([this](libusb_device *device, bool arrived) { queueEvent(device, arrived); });
+        printf("Waiting for an %s to be connected\n", cardName());
+        _context.watchDevices(_options.deviceType,
+                              [this](libusb_device *device, bool arrived) { queueEvent(device, arrived); });
 
         while (!stop) {
             handleEvents();
@@ -73,12 +78,12 @@ namespace lgx2d {
 
             if (event.arrived) {
                 if (_session) {
-                    printf("Another LGX2 was connected; only one is captured at a time\n");
+                    printf("Another %s was connected; only one is captured at a time\n", cardName());
                 } else {
                     openSession(event.device);
                 }
             } else if (event.device == _sessionDevice) {
-                endSession("LGX2 disconnected");
+                endSession(std::string(cardName()) + " disconnected");
             }
             libusb_unref_device(event.device);
         }
@@ -86,7 +91,7 @@ namespace lgx2d {
 
     void CaptureDaemon::openSession(libusb_device *device) {
         lgx2::DeviceType type;
-        if (!libusb::UsbContext::usable(device, type)) return;
+        if (!libusb::UsbContext::usable(device, type) || type != _options.deviceType) return;
 
         libusb::DeviceSession::Options options;
         options.statusPoll = _options.statusPoll;
@@ -106,7 +111,7 @@ namespace lgx2d {
                 std::this_thread::sleep_for(OPEN_RETRY_DELAY);
             }
         }
-        fprintf(stderr, "Giving up on this LGX2 until it is reconnected\n");
+        fprintf(stderr, "Giving up on this %s until it is reconnected\n", cardName());
     }
 
     void CaptureDaemon::endSession(const std::string &reason) {
@@ -116,6 +121,6 @@ namespace lgx2d {
         _session.reset();
         libusb_unref_device(_sessionDevice);
         _sessionDevice = nullptr;
-        printf("Waiting for an LGX2 to be connected\n");
+        printf("Waiting for an %s to be connected\n", cardName());
     }
 }

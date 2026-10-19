@@ -87,15 +87,16 @@ namespace libusb {
         return found;
     }
 
-    void UsbContext::watchDevices(HotplugCallback callback) {
+    void UsbContext::watchDevices(lgx2::DeviceType type, HotplugCallback callback) {
         if (!libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)) {
             throw std::runtime_error("This platform's libusb does not support hotplug notifications");
         }
         _hotplugCallback = std::move(callback);
+        const int productId = type == lgx2::DeviceType::LGX2 ? 0x0551 : 0x4710;
         int res = libusb_hotplug_register_callback(
                 _context,
                 static_cast<libusb_hotplug_event>(LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
-                LIBUSB_HOTPLUG_ENUMERATE, 0x07ca, 0x0551, LIBUSB_HOTPLUG_MATCH_ANY,
+                LIBUSB_HOTPLUG_ENUMERATE, 0x07ca, productId, LIBUSB_HOTPLUG_MATCH_ANY,
                 &UsbContext::hotplugEvent, this, &_hotplugHandle);
         if (res != LIBUSB_SUCCESS) {
             throw std::runtime_error(std::string("Could not register for USB hotplug events: ") + libusb_error_name(res));

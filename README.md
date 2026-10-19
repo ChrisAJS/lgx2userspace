@@ -126,7 +126,7 @@ into the input of the device.
 its desktop. As with the official driver, such video is never captured: you will see an "HDCP PROTECTED" screen and
 `HDMI input: HDCP-protected source (not captured)`. On the LGX2 (GC551), its HDMI front-end then stays locked in this
 state even after you connect a different source: **unplug and replug the LGX2's USB cable** before using another source.
-(The LGX (GC550) has no such front-end and should recover as soon as the protected source is disconnected.)
+(The LGX (GC550) has no such front-end and recovers as soon as the protected source is replaced.)
 
 If you attempt to run the application and it exits immediately, look at the error output, it may help diagnose the issue,
 which will likely be that you haven't installed the udev rules required to give your user permission to access the LGX or
@@ -207,8 +207,8 @@ options v4l2loopback devices=2 video_nr=99,98 exclusive_caps=1,1 card_label="LGX
 ```
 
 ## Running the capture daemon (lgx2d)
-`lgx2d` captures without a window, for use by OBS and other software. It waits for the LGX2 to be
-plugged in, bootstraps it, captures until it is unplugged, and then waits again, so it can be
+`lgx2d` captures without a window, for use by OBS and other software. It waits for the LGX2 (or,
+with `-x`, the LGX) to be plugged in, bootstraps it, captures until it is unplugged, and then waits again, so it can be
 left running. While there is no picture it keeps sending a card saying why ("NO CAPTURE DEVICE",
 "NO HDMI CABLE", "NO SIGNAL"), so the video device never stops producing frames.
 
@@ -223,6 +223,13 @@ With a loopback device set up (see above):
   Capture (PipeWire)* source and select it. Several applications can record from it at once. It
   is muted while there is no signal. Pass `-A` to disable audio; building without the PipeWire
   development files leaves it out entirely.
+* `-x` captures from an **LGX (GC550)** instead of an LGX2. This needs a build with GC550 support
+  (`-DENABLE_LGX_GC550_SUPPORT=ON`; read *LGX (GC550) Issues* first). Each run captures one kind
+  of card. The outputs keep their names (the **LGX2** loopback label, **LGX2 Audio**), so OBS and
+  the viewer work the same with either card:
+  ```bash
+  ./src/lgx2d/lgx2d -x -d /dev/video99
+  ```
 * `-p` disables the HDMI status poll (and with it muting and the no-signal cards). Stop with
   Ctrl+C.
 

@@ -11,13 +11,15 @@
 #include <CapturePipeline.h>
 
 namespace lgx2d {
-    // Waits for an LGX2 to be plugged in, bootstraps it and captures from it until it is unplugged,
-    // then waits again. The capture goes through a CapturePipeline with keep-alive frames, so the
+    // Waits for a card (an LGX2 by default, or an LGX) to be plugged in, bootstraps it and captures
+    // from it until it is unplugged, then waits again. The capture goes through a CapturePipeline with keep-alive frames, so the
     // video output always has frames: the picture, or a card saying why there is none.
     class CaptureDaemon {
     public:
         struct Options {
             bool statusPoll{true};
+            // The kind of card to wait for; only one kind is captured per run.
+            lgx2::DeviceType deviceType{lgx2::DeviceType::LGX2};
         };
 
         CaptureDaemon(lgx2::VideoOutput *video, lgx2::AudioOutput *audio, Options options);
@@ -49,6 +51,9 @@ namespace lgx2d {
 
         std::unique_ptr<libusb::DeviceSession> _session;
         libusb_device *_sessionDevice{nullptr}; // referenced while the session exists
+
+        // "LGX2" or "LGX", for messages.
+        const char *cardName() const;
 
         void queueEvent(libusb_device *device, bool arrived);
         void handleEvents();
