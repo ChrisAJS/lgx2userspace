@@ -520,12 +520,14 @@ check. The host driver is what enforces it.
 
 The section has therefore been **removed** from `lgx_setup_commands`. Nothing
 else in the GC550 string uses opcodes `05`/`06`/`07`/`09`. Removing it cannot
-unlock a set that is already locked. To check a card, `Bootstrapper` prints
-the attempt counters before bootstrapping. It uses Read Config Zone (`05 B6 00 <addr> 01`,
-`06 01`, which needs no authentication and changes nothing) at `0x50`/`0x60`/`0x70`
-(key sets 0–2) and `0xB0`/`0xB8`/`0xC0`/`0xD0` (password sets 0, 1, 2, 4).
-`FF` means never failed. The address layout is from the AT88SC datasheet and
-matches the reads in the recording.
+unlock a set that is already locked. The attempt counters can be read with
+Read Config Zone (`05 B6 00 <addr> 01`, `06 01`, which needs no authentication
+and changes nothing) at `0x50`/`0x60`/`0x70` (key sets 0–2) and
+`0xB0`/`0xB8`/`0xC0`/`0xD0` (password sets 0, 1, 2, 4). `FF` means never
+failed. The address layout is from the AT88SC datasheet and matches the reads
+in the recording. `Bootstrapper` used to print them on every run. It no longer
+does: `CommandGuard` refuses every AT88SC command (`05`/`06`/`07`/`09`), reads
+included, so no code path can address the chip.
 
 **Hardware results.**
 - A GC550 that had been used with the old replay reads `00` for every key set
@@ -534,8 +536,10 @@ matches the reads in the recording.
   bootstraps with the stripped string. So the new bootstrap spends no attempts.
 - Video and audio work without the CryptoMemory section, so the card does not
   need it.
-- **Not yet confirmed:** that the pristine card still works with the Windows
-  driver afterwards.
+- **Confirmed (one card, bcdDevice 2.07):** a pristine GC550 that was
+  bootstrapped and captured on Linux with the stripped string, behind
+  `CommandGuard`, worked straight away afterwards with the official driver and
+  OBS on Windows 10.
 
 **Reuse and status poll on the GC550 (hardware-verified, on the locked card).**
 - Board-state detection recognises a configured GC550 and reuses its
