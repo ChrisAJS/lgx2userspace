@@ -128,6 +128,35 @@ TEST_CASE("Video frame assembly with straddling chunk boundaries", "[framebuilde
     }
 }
 
+TEST_CASE("A marker whose 00 FF FF prefix is split by a chunk boundary is still found", "[framebuilder]") {
+    // A chunk ending in 00 / 00 FF / 00 FF FF is carried over to the next feed() (the scan
+    // stops 3 bytes short of the end). Split the frame's EAV exactly there.
+    for (uint32_t prefixBytes = 1; prefixBytes <= 3; prefixBytes++) {
+        DYNAMIC_SECTION("chunk ends after " << prefixBytes << " byte(s) of the EAV marker") {
+            FrameBuilder builder;
+            FrameCapture capture;
+            captureCallbacks(builder, capture);
+
+            std::vector<uint8_t> stream;
+            appendVideoFrame(stream, 0x30);
+            const uint32_t eavStart = 8 + FrameBuilder::VIDEO_FRAME_BYTES;
+            REQUIRE(stream[eavStart + 3] == 0xC1);
+
+            const uint32_t split = eavStart + prefixBytes;
+            builder.feed(stream.data(), split, false);
+            builder.feed(stream.data() + split, static_cast<uint32_t>(stream.size() - split), false);
+
+            REQUIRE(builder.videoFramesEmitted() == 1);
+            REQUIRE(builder.desyncCount() == 0);
+            const auto &frame = capture.videoFrames[0];
+            for (uint32_t i = 0; i < FrameBuilder::VIDEO_FRAME_BYTES; i += 997) {
+                REQUIRE(frame[i] == frameByte(i, 0x30));
+            }
+            REQUIRE(frame[FrameBuilder::VIDEO_FRAME_BYTES - 1] == frameByte(FrameBuilder::VIDEO_FRAME_BYTES - 1, 0x30));
+        }
+    }
+}
+
 TEST_CASE("Invalid SAV checksum is ignored without desync", "[framebuilder]") {
     FrameBuilder builder;
     FrameCapture capture;

@@ -217,6 +217,9 @@ namespace utils {
             if (n >= 1 && buf[n - 1] == 0x00) _carryLen = 1;
             else if (n >= 2 && buf[n - 2] == 0x00 && buf[n - 1] == 0xFF) _carryLen = 2;
             else if (n >= 3 && buf[n - 3] == 0x00 && buf[n - 2] == 0xFF && buf[n - 1] == 0xFF) _carryLen = 3;
+            // Keep those bytes: the next feed() prepends _carry, and without the copy it would
+            // prepend stale bytes, losing the marker and corrupting the frame.
+            if (_carryLen > 0) memcpy(_carry, buf + n - _carryLen, _carryLen);
 
             // Flush all video data except the carried tail, which may prove to be a marker prefix.
             if (_state == State::VideoData) flushVideo(_videoPendingStart, n - _carryLen);

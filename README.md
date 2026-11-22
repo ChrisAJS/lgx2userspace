@@ -14,21 +14,21 @@ to forward the captured video and audio to a virtual video capture device.
 There is even an incredibly unnecessary Windows build. Instructions on how to use this can be found in [WINDOWS.md](WINDOWS.md). Spoiler, it's not recommended. 
 
 ## LGX (GC550) Issues
-The LGX (GC550) will not be correctly configured by the official Windows driver after using this userspace driver on Linux (or the Windows build).
+**Versions before commit f150158 make a GC550 permanently unusable with the official Windows driver.** They replayed a
+recorded login to the card's anti-clone chip (an AT88SC CryptoMemory). That login always fails, and after a few runs
+the chip locks for good; the official driver then rejects the card ("Not our product"). A card locked this way cannot be
+recovered in software. Do not use an old build with a GC550 you want to keep using on Windows.
 
-If you intend on using this userspace driver for your LGX, please understand that you will no longer be able to use the official driver to use the
-device.
+The current bootstrap no longer sends that login, and every command sent to the card goes through an allow-list
+(`CommandGuard`). Only I2C to the board's volatile chips, the one board-info read and the bridge command the
+Windows driver also sends are allowed. Anti-clone chip, config-memory and any other commands are refused before
+anything is sent. The program no longer talks to the anti-clone chip at all, not even to read it.
+
+*Confirmed on one card:* a pristine GC550 (bcdDevice 2.07) bootstrapped and captured with this build on Linux, then
+worked straight away with the official driver and OBS on Windows 10. That is one card; the warning at the top of this README still
+applies. See PROTOCOL.md, "GC550 (LGX) bootstrap".
 
 To enable LGX (GC550) support, add `-DENABLE_LGX_GC550_SUPPORT=ON` to the `cmake` invocation.
-
-**It cannot be stressed enough, that this currently will make your LGX (GC550) unusable on Windows using the official driver.**
-
-*Update (untested on Windows):* the cause appears to have been found and removed. Older versions replayed a recorded
-login to the card's anti-clone chip, which always fails and permanently locks the chip after a few runs; the official
-driver then rejects the card. The bootstrap no longer sends it. On a GC550, every run prints the chip's attempt counters
-(`Anti-clone chip attempt counters ...`): `FF` means untouched, `00` means locked. A pristine card stays at `FF` across
-runs, but whether it still works with the official driver afterwards has not been confirmed yet, so the warning above
-stands until it has. See PROTOCOL.md, "GC550 (LGX) bootstrap".
 
 ## Building
 To build the project, you will need:
@@ -73,7 +73,7 @@ cmake --build build
 
 | Option | Default | Description |
 |---|---|---|
-| `ENABLE_LGX_GC550_SUPPORT` | `OFF` | Compile in support for the LGX (GC550). **Warning:** using this driver with a GC550 will prevent the official Windows driver from working on that device. See the LGX (GC550) Issues section. |
+| `ENABLE_LGX_GC550_SUPPORT` | `OFF` | Compile in support for the LGX (GC550). **Warning:** builds before f150158 permanently stop the official Windows driver from working with a GC550. Read the LGX (GC550) Issues section first. |
 | `LGX2_VERBOSE_STATS` | `OFF` | Print per-second frame rate and frame size statistics to stdout. Useful for diagnosing capture performance issues. |
 
 Pass options to cmake with `-D`, for example:

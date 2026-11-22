@@ -5,11 +5,15 @@
 #include <mutex>
 #include <string>
 #include <libusb-1.0/libusb.h>
+#include "lgxinterfaces.h"
 
 namespace libusb {
     // The device's USB-to-I2C bridge on bulk OUT 0x01 / IN 0x81 (see PROTOCOL.md, "Bootstrap
     // command stream"). Used for the bootstrap and, while streaming on IN 0x83, for runtime
     // register access. Each call holds a mutex, so it can be shared between threads.
+    // Every command sent to OUT 0x01 passes CommandGuard first (see CommandGuard.h): anything the
+    // recorded Windows bootstrap does not itself send, in particular any CryptoMemory command, is
+    // refused and never reaches the device.
     class CommandBridge {
     public:
         // Matches the Windows driver, whose synchronous URB helper (FUN_1400157c4) waits up to
@@ -19,22 +23,20 @@ namespace libusb {
         // wMaxPacketSize of the command endpoints (SuperSpeed bulk).
         static constexpr int COMMAND_MAX_PACKET = 1024;
 
-        explicit CommandBridge(libusb_device_handle *dev);
+        CommandBridge(libusb_device_handle *dev, lgx2::DeviceType type);
 
         // Read `count` bytes from register `reg` of the 7-bit I2C slave `address`.
         int i2cRead(uint8_t address, uint8_t reg, uint8_t *out, uint8_t count);
         int i2cWrite(uint8_t address, uint8_t reg, uint8_t value);
-
-        // GC550 only: read `count` bytes at `address` of the AT88SC CryptoMemory configuration
-        // zone (Read Config Zone, B6), which needs no authentication and changes nothing.
-        int cryptoReadConfig(uint8_t address, uint8_t *out, uint8_t count);
 
         // Discard any replies waiting in IN 0x81, so the next reply is not attributed to the
         // wrong request.
         void drainResponses();
 
         // Replay a recorded command stream: ">hex" tokens are written to OUT 0x01, "<N" tokens
-        // read N bytes from IN 0x81. Throws on a short transfer.
+        // read N bytes from IN 0x81. The whole stream is checked by CommandGuard before its first
+        // command is sent; throws CommandRejected if any command is refused (nothing is sent
+        // then), or std::runtime_error on a short transfer.
         void replay(const std::string &commands);
 
         // Which half of the last failed command failed, for diagnostics.
@@ -42,10 +44,14 @@ namespace libusb {
 
     private:
         libusb_device_handle *_dev;
+        lgx2::DeviceType _type;
         mutable std::mutex _mutex;
         const char *_lastFailure{""};
 
         void drainResponsesLocked();
+        // The only way anything is written to OUT 0x01: refuses (LIBUSB_ERROR_NOT_SUPPORTED, and
+        // a message on stderr) a command CommandGuard does not allow.
+        int sendCommand(const uint8_t *command, int length, int *actualLength, unsigned int timeoutMs);
     };
 }
 

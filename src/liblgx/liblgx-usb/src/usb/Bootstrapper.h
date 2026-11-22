@@ -27,7 +27,6 @@ namespace libusb {
 
         BoardState detectBoardState();
         bool videoAlreadyFlowing();
-        void reportCryptoAttemptCounters();
         void setAutoInputColourSpace();
         void resetPictureAdjustment();
     };

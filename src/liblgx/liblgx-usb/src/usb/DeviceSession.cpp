@@ -25,7 +25,7 @@ namespace libusb {
                     "Could not claim interface for the device - is something else using the device?");
         }
 
-        _bridge = std::make_unique<CommandBridge>(_dev);
+        _bridge = std::make_unique<CommandBridge>(_dev, _type);
         _statusMonitor = std::make_unique<StatusMonitor>(*_bridge, _type);
     }
 

@@ -1,12 +1,27 @@
 #include "CommandBridge.h"
+#include "CommandGuard.h"
 
+#include <cstdio>
 #include <cstring>
 #include <sstream>
 #include <stdexcept>
 
 namespace libusb {
 
-    CommandBridge::CommandBridge(libusb_device_handle *dev) : _dev{dev} {
+    CommandBridge::CommandBridge(libusb_device_handle *dev, lgx2::DeviceType type) : _dev{dev}, _type{type} {
+    }
+
+    int CommandBridge::sendCommand(const uint8_t *command, int length, int *actualLength, unsigned int timeoutMs) {
+        *actualLength = 0;
+        std::string reason = commandGuardReason(_type, command, length > 0 ? static_cast<size_t>(length) : 0);
+        if (!reason.empty()) {
+            fprintf(stderr, "Command guard refused to send %s\n", reason.c_str());
+            _lastFailure = "refused by the command guard";
+            return LIBUSB_ERROR_NOT_SUPPORTED;
+        }
+        // libusb takes a non-const buffer even for OUT transfers; it does not modify it.
+        return libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, const_cast<uint8_t *>(command), length,
+                                    actualLength, timeoutMs);
     }
 
     int CommandBridge::i2cRead(uint8_t address, uint8_t reg, uint8_t *out, uint8_t count) {
@@ -18,8 +33,7 @@ namespace libusb {
         int actualLength = 0;
 
         _lastFailure = "request (OUT 0x01)";
-        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, request, sizeof(request),
-                                       &actualLength, COMMAND_TIMEOUT_MS);
+        int res = sendCommand(request, sizeof(request), &actualLength, COMMAND_TIMEOUT_MS);
         if (res != LIBUSB_SUCCESS) return res;
         if (actualLength != static_cast<int>(sizeof(request))) return LIBUSB_ERROR_IO;
 
@@ -48,48 +62,9 @@ namespace libusb {
         uint8_t request[] = {0x01, address, 0x01, reg, value};
         int actualLength = 0;
         _lastFailure = "request (OUT 0x01)";
-        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, request, sizeof(request),
-                                       &actualLength, COMMAND_TIMEOUT_MS);
+        int res = sendCommand(request, sizeof(request), &actualLength, COMMAND_TIMEOUT_MS);
         if (res != LIBUSB_SUCCESS) return res;
         return actualLength == static_cast<int>(sizeof(request)) ? LIBUSB_SUCCESS : LIBUSB_ERROR_IO;
-    }
-
-    int CommandBridge::cryptoReadConfig(uint8_t address, uint8_t *out, uint8_t count) {
-        std::lock_guard<std::mutex> lock(_mutex);
-
-        // As recorded from the Windows driver (see PROTOCOL.md, "GC550 CryptoMemory"): 05 sends
-        // the 4-byte CryptoMemory command <cmd> <p1> <p2> <N> without a reply, then 06 <N> clocks
-        // in N bytes, answered on IN 0x81.
-        uint8_t command[] = {0x05, 0xB6, 0x00, address, count};
-        uint8_t readRequest[] = {0x06, count};
-        int actualLength = 0;
-
-        _lastFailure = "command (OUT 0x01)";
-        int res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, command, sizeof(command), &actualLength,
-                                       COMMAND_TIMEOUT_MS);
-        if (res != LIBUSB_SUCCESS) return res;
-        if (actualLength != static_cast<int>(sizeof(command))) return LIBUSB_ERROR_IO;
-
-        _lastFailure = "read request (OUT 0x01)";
-        res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, readRequest, sizeof(readRequest), &actualLength,
-                                   COMMAND_TIMEOUT_MS);
-        if (res != LIBUSB_SUCCESS) return res;
-        if (actualLength != static_cast<int>(sizeof(readRequest))) return LIBUSB_ERROR_IO;
-
-        _lastFailure = "reply (IN 0x81)";
-        uint8_t reply[COMMAND_MAX_PACKET];
-        res = libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x01, reply, sizeof(reply), &actualLength,
-                                   COMMAND_TIMEOUT_MS);
-        if (res == LIBUSB_ERROR_PIPE) {
-            libusb_clear_halt(_dev, LIBUSB_ENDPOINT_IN | 0x01);
-        }
-        if (res != LIBUSB_SUCCESS) return res;
-        if (actualLength != count) {
-            _lastFailure = "reply (IN 0x81, unexpected length)";
-            return LIBUSB_ERROR_IO;
-        }
-        memcpy(out, reply, count);
-        return LIBUSB_SUCCESS;
     }
 
     void CommandBridge::drainResponses() {
@@ -108,7 +83,11 @@ namespace libusb {
     void CommandBridge::replay(const std::string &commands) {
         std::lock_guard<std::mutex> lock(_mutex);
 
-        int actualLength;
+        // Refuse the whole stream before sending anything if any command in it is not allowed,
+        // so a bad recording can never leave the board half-configured.
+        checkReplayCommands(_type, commands);
+
+        int actualLength = 0;
         uint8_t transferBuffer[512]{0};
 
         auto stream = std::istringstream{commands};
@@ -119,13 +98,18 @@ namespace libusb {
                 for (int i = 0; i < commandLength; i++) {
                     transferBuffer[i] = std::stoi(command.substr(1 + i * 2, 2), nullptr, 16);
                 }
-                libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_OUT | 0x01, transferBuffer, static_cast<int>(commandLength),
-                                     &actualLength, 0);
+                if (commandLength > static_cast<int>(sizeof(transferBuffer))) {
+                    throw std::runtime_error("Setup command too long");
+                }
+                sendCommand(transferBuffer, commandLength, &actualLength, 0);
                 if (actualLength != commandLength) {
                     throw std::runtime_error("Under-run when attempting to write command data for setup");
                 }
             } else {
                 int bytesToRead = std::stoi(command.substr(1));
+                if (bytesToRead <= 0 || bytesToRead > static_cast<int>(sizeof(transferBuffer))) {
+                    throw std::runtime_error("Setup read too long");
+                }
                 libusb_bulk_transfer(_dev, LIBUSB_ENDPOINT_IN | 0x01, transferBuffer, bytesToRead, &actualLength, 0);
                 if (actualLength != bytesToRead) {
                     throw std::runtime_error("Under-run when attempting to read data during setup");
