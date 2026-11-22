@@ -255,6 +255,12 @@ fails with "Device or resource busy". Audio has no such limit.
 
 * If no device named **LGX2** is offering video, it exits and asks whether `lgx2d` is running.
   Use `-i /dev/video99` to name the device yourself.
+* `-a <source>` plays another PipeWire source instead of **LGX2 Audio**, named by its
+  `node.name` (list them with `pw-cli ls Node`). With `-i`, this lets the viewer show any capture
+  device that offers 1080p YUYV with its sound, for example a capture card that has a kernel
+  driver:
+  `./lgx2userspace -i /dev/video2 -a alsa_input.usb-<card>.stereo-fallback`. The named source is
+  used strictly: if it does not exist, there is no sound, rather than the default microphone.
 * `-D` captures from the LGX2 directly instead (as on other platforms), without `lgx2d`; stop
   `lgx2d` first, since only one program can own the LGX2. `-d`, `-f` and `-x` imply `-D`.
 

@@ -20,8 +20,8 @@ namespace pipewire {
         }
     }
 
-    PipeWireAudioSource::PipeWireAudioSource(Callback callback, std::string target)
-            : _callback{std::move(callback)}, _target{std::move(target)} {
+    PipeWireAudioSource::PipeWireAudioSource(Callback callback, std::string target, bool strictTarget)
+            : _callback{std::move(callback)}, _target{std::move(target)}, _strictTarget{strictTarget} {
     }
 
     PipeWireAudioSource::~PipeWireAudioSource() {
@@ -40,6 +40,8 @@ namespace pipewire {
                 PW_KEY_MEDIA_ROLE, "Production",
                 PW_KEY_TARGET_OBJECT, _target.c_str(),
                 nullptr);
+        // WirePlumber policy: link only to target.object, never to the default source.
+        if (_strictTarget) pw_properties_set(props, "node.dont-fallback", "true");
 
         _stream = pw_stream_new_simple(pw_thread_loop_get_loop(_loop), "lgx2userspace", props,
                                        streamEvents(&PipeWireAudioSource::onProcess), this);

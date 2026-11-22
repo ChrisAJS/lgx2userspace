@@ -41,11 +41,21 @@ static int viewDaemonOutput(app::OptionParser &options) {
 
 #ifdef LGX2_VIEWER_PIPEWIRE
         // Called on PipeWire's thread; the audio outputs accept data from any thread.
-        pipewire::PipeWireAudioSource audioSource{[audioOutput](const uint8_t *pcm, uint32_t length) {
+        // -a names any PipeWire source (e.g. a capture card's own ALSA source); it is used
+        // strictly, so a typo gives silence rather than the default microphone.
+        const std::string &audioTarget = options.audioSource();
+        auto onAudio = [audioOutput](const uint8_t *pcm, uint32_t length) {
             audioOutput->audioFrameAvailable(pcm, length);
-        }};
+        };
+        pipewire::PipeWireAudioSource audioSource = audioTarget.empty()
+                ? pipewire::PipeWireAudioSource{onAudio}
+                : pipewire::PipeWireAudioSource{onAudio, audioTarget, true};
         audioSource.start();
-        printf("Listening to lgx2d audio (PipeWire source \"LGX2 Audio\")\n");
+        if (audioTarget.empty()) {
+            printf("Listening to lgx2d audio (PipeWire source \"LGX2 Audio\")\n");
+        } else {
+            printf("Listening to PipeWire source \"%s\"\n", audioTarget.c_str());
+        }
 #else
         printf("Built without PipeWire: no audio\n");
 #endif
@@ -91,6 +101,9 @@ int main(int argc, char **argv) {
 #ifdef __linux__
     if (!optionParser.direct()) {
         return viewDaemonOutput(optionParser);
+    }
+    if (!optionParser.audioSource().empty()) {
+        fprintf(stderr, "-a only applies when viewing (without -D/-d/-f/-x); ignoring it\n");
     }
 #endif
 

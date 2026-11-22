@@ -15,7 +15,10 @@ namespace pipewire {
     public:
         using Callback = std::function<void(const uint8_t *pcm, uint32_t byteLength)>;
 
-        explicit PipeWireAudioSource(Callback callback, std::string target = "lgx2_audio");
+        // With strictTarget, record only from `target`: if it does not exist, stay silent
+        // instead of falling back to the default source (usually a microphone).
+        explicit PipeWireAudioSource(Callback callback, std::string target = "lgx2_audio",
+                                     bool strictTarget = false);
         ~PipeWireAudioSource();
         PipeWireAudioSource(const PipeWireAudioSource &) = delete;
         PipeWireAudioSource &operator=(const PipeWireAudioSource &) = delete;
@@ -26,6 +29,7 @@ namespace pipewire {
     private:
         Callback _callback;
         std::string _target;
+        bool _strictTarget;
         pw_thread_loop *_loop{nullptr};
         pw_stream *_stream{nullptr};
 
