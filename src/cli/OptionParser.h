@@ -21,6 +21,8 @@ namespace app {
         bool direct();
         // lgx2d's V4L2 device to view (-i); empty to find it by name.
         const std::string &inputDevice();
+        // PipeWire source to play when viewing (-a, a node.name); empty for lgx2d's.
+        const std::string &audioSource();
 
     private:
         lgx2::VideoOutput *_videoOutput;
@@ -35,6 +37,7 @@ namespace app {
         bool _direct{true};
 #endif
         std::string _inputDevice;
+        std::string _audioSource;
     };
 }
 

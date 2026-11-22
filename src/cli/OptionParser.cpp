@@ -34,10 +34,14 @@ const std::string &app::OptionParser::inputDevice() {
     return _inputDevice;
 }
 
+const std::string &app::OptionParser::audioSource() {
+    return _audioSource;
+}
+
 bool app::OptionParser::process(int argc, char **argv) {
     for(;;)
     {
-        switch(getopt(argc, argv, "vVd:hxsgfS:Di:"))
+        switch(getopt(argc, argv, "vVd:hxsgfS:Di:a:"))
         {
 #ifndef __MINGW32__
 #ifndef __APPLE__
@@ -48,6 +52,9 @@ bool app::OptionParser::process(int argc, char **argv) {
                 continue;
             case 'i':
                 _inputDevice = optarg;
+                continue;
+            case 'a':
+                _audioSource = optarg;
                 continue;
 #endif
 #endif
@@ -96,6 +103,8 @@ bool app::OptionParser::process(int argc, char **argv) {
                     "By default, shows the video and audio lgx2d is capturing (start lgx2d first).\n"
                     "\t-D\tCapture from the LGX2 directly instead (lgx2d must not be running)\n"
                     "\t-i V4L2Device\tlgx2d's V4L2 device to view (default: find the device named LGX2)\n"
+                    "\t-a PipeWireSource\tWhen viewing, play this PipeWire source (its node.name, see\n"
+                    "\t\t`pw-cli ls Node`) instead of lgx2d's audio; no fallback to another source\n"
 #endif
                     "\t-h\tPrint this usage message\n"
                     "\t-v\tPrint diagnostics information summary at end of execution, useful when submitting bugs\n"
