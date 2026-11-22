@@ -14,6 +14,8 @@ set(USB_SOURCES
         src/usb/UsbStream.h
         src/usb/CommandBridge.cpp
         src/usb/CommandBridge.h
+        src/usb/CommandGuard.cpp
+        src/usb/CommandGuard.h
         src/usb/Bootstrapper.cpp
         src/usb/Bootstrapper.h
         src/usb/StatusMonitor.cpp

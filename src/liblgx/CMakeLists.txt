@@ -101,3 +101,8 @@ add_test(audiogate_test audiogate_test)
 add_executable(capturepipeline_test test/CapturePipeline.t.cpp test/catch_amalgamated.cpp test/catch_amalgamated.hpp)
 target_link_libraries(capturepipeline_test PRIVATE liblgx-core)
 add_test(capturepipeline_test capturepipeline_test)
+
+# Links liblgx-usb (and so libusb) for the bootstrap strings; it never opens a device.
+add_executable(commandguard_test test/CommandGuard.t.cpp test/catch_amalgamated.cpp test/catch_amalgamated.hpp)
+target_link_libraries(commandguard_test PRIVATE liblgx-usb)
+add_test(commandguard_test commandguard_test)

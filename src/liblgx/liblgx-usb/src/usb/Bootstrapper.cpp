@@ -28,9 +28,8 @@ namespace libusb {
 #endif
         }
 
-        if (deviceType != lgx2::DeviceType::LGX2) {
-            reportCryptoAttemptCounters();
-        }
+        // The GC550's AT88SC CryptoMemory is never addressed, not even with a read: CommandGuard
+        // refuses its transport opcodes outright.
 
         bool alreadyBootstrapped = false;
         BoardState boardState = detectBoardState();
@@ -94,33 +93,6 @@ namespace libusb {
         fprintf(stderr, "Unrecognised board state (ADV7604 EDID map 0x%02X, PCA9539A config %02X %02X)\n",
                 edidMapAddress, pcaConfig[0], pcaConfig[1]);
         return BoardState::Unknown;
-    }
-
-    void Bootstrapper::reportCryptoAttemptCounters() {
-        // The GC550's AT88SC CryptoMemory (checked by the Windows driver) permanently locks a key
-        // or password set after a few failed attempts. The bootstrap no longer authenticates, so
-        // these counters should never change under this driver; print them so that can be checked.
-        // A key set counter is FF when unused and steps FF -> EE -> CC -> 88 -> 00 (locked).
-        _bridge.drainResponses();
-        constexpr struct { uint8_t address; const char *name; } COUNTERS[] = {
-            {0x50, "key set 0"}, {0x60, "key set 1"}, {0x70, "key set 2"},
-            {0xB0, "password 0"}, {0xB8, "password 1"}, {0xC0, "password 2"}, {0xD0, "password 4"},
-        };
-        std::string line;
-        for (const auto &counter : COUNTERS) {
-            uint8_t value = 0;
-            int res = _bridge.cryptoReadConfig(counter.address, &value, 1);
-            if (res != LIBUSB_SUCCESS) {
-                fprintf(stderr, "Could not read the anti-clone chip's %s counter (%s on %s)\n", counter.name,
-                        libusb_error_name(res), _bridge.lastFailure());
-                _bridge.drainResponses();
-                return;
-            }
-            char entry[32];
-            snprintf(entry, sizeof(entry), "%s%s %02X", line.empty() ? "" : ", ", counter.name, value);
-            line += entry;
-        }
-        printf("Anti-clone chip attempt counters (FF = never failed, 00 = locked): %s\n", line.c_str());
     }
 
     void Bootstrapper::setAutoInputColourSpace() {
